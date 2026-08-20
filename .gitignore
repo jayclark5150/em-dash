@@ -1,0 +1,7 @@
+config.js
+*.zip
+v1.3.0/
+markdown-pwa/
+*.code-workspace
+.vscode/
+.DS_Store

@@ -1,0 +1,29 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d97a3e"></stop>
+      <stop offset="1" stop-color="#8a3a14"></stop>
+    </linearGradient>
+    <linearGradient id="topHL" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="rgba(255,255,255,0.55)"></stop>
+      <stop offset="0.18" stop-color="rgba(255,255,255,0.10)"></stop>
+      <stop offset="0.30" stop-color="rgba(255,255,255,0)"></stop>
+    </linearGradient>
+  </defs>
+
+  
+  <path d="M 220 0 H 804 C 924 0 1024 100 1024 220 V 804 C 1024 924 924 1024 804 1024 H 220 C 100 1024 0 924 0 804 V 220 C 0 100 100 0 220 0 Z" fill="url(#bg)"></path>
+
+  
+  <path d="M 188 388 Q 188 380 200 378 L 824 378 Q 836 380 836 388 L 836 456 Q 836 464 824 466 L 200 466 Q 188 464 188 456 Z" fill="#fbeed1"></path>
+  <path d="M 200 382 L 824 382" stroke="rgba(255,255,255,0.18)" stroke-width="3" stroke-linecap="round"></path>
+
+  
+  <text x="512" y="708" text-anchor="middle" class="wm">markdown</text>
+
+  
+  <path d="M 220 0 H 804 C 924 0 1024 100 1024 220 V 804 C 1024 924 924 1024 804 1024 H 220 C 100 1024 0 924 0 804 V 220 C 0 100 100 0 220 0 Z" fill="url(#topHL)" style="mix-blend-mode: screen;"></path>
+  <path d="M 220 0 H 804 C 924 0 1024 100 1024 220 V 804 C 1024 924 924 1024 804 1024 H 220 C 100 1024 0 924 0 804 V 220 C 0 100 100 0 220 0 Z" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="2"></path>
+</svg>
