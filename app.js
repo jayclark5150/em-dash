@@ -1349,7 +1349,12 @@ async function createDriveFolder(name, parentId) {
   await renderTree();
 }
 
-async function createDriveFileInFolder(name, parentId, content = '') {
+// Uploads one file to Drive without side effects (no tree refresh, no
+// switching the open editor). Used directly by bulk import so a batch of N
+// files doesn't refresh the tree or steal focus N times. Single-file import
+// and inline "New File" still go through createDriveFileInFolder below,
+// which wraps this with the tree-refresh + open-in-editor behavior.
+async function createDriveFileRaw(name, parentId, content = '') {
   const boundary = '-------314159265358979323846';
   const metadata = JSON.stringify({ name, mimeType: 'text/markdown', parents: [parentId] });
   const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: text/markdown\r\n\r\n${content}\r\n--${boundary}--`;
@@ -1357,10 +1362,15 @@ async function createDriveFileInFolder(name, parentId, content = '') {
     path: '/upload/drive/v3/files', method: 'POST', params: { uploadType: 'multipart' },
     headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` }, body
   });
+  return res.result;
+}
+
+async function createDriveFileInFolder(name, parentId, content = '') {
+  const result = await createDriveFileRaw(name, parentId, content);
   delete treeCache[parentId];
   await renderTree();
-  await loadDriveFile(res.result.id, name, parentId);
-  return res.result;
+  await loadDriveFile(result.id, name, parentId);
+  return result;
 }
 
 async function createInlineNode(isFolder) {
@@ -1436,17 +1446,49 @@ document.getElementById('hdr-import-btn').addEventListener('click', () => {
 });
 
 document.getElementById('import-file-input').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
+  const files = Array.from(e.target.files);
   e.target.value = '';
-  if (!file) return;
+  if (!files.length) return;
   if (!driveConnected) { showToast('Connect Google Drive first'); return; }
-  try {
-    const text = await file.text();
-    const targetFolder = selectedFolderId || driveRootFolderId;
-    await createDriveFileInFolder(file.name, targetFolder, text);
-    showToast(`✓ Imported "${file.name}"`);
-  } catch (err) {
-    showToast('Import failed: ' + gErr(err));
+
+  // Single file: keep the original behavior (opens it in the editor after
+  // upload). Multiple files: bulk-import without switching the open editor
+  // or refreshing the tree after every single file — refresh once at the end.
+  if (files.length === 1) {
+    const file = files[0];
+    try {
+      const text = await file.text();
+      const targetFolder = selectedFolderId || driveRootFolderId;
+      await createDriveFileInFolder(file.name, targetFolder, text);
+      showToast(`✓ Imported "${file.name}"`);
+    } catch (err) {
+      showToast('Import failed: ' + gErr(err));
+    }
+    return;
+  }
+
+  const targetFolder = selectedFolderId || driveRootFolderId;
+  let succeeded = 0;
+  const failed = [];
+  for (const file of files) {
+    showToast(`Importing ${succeeded + failed.length + 1}/${files.length}: "${file.name}"…`, 60000);
+    try {
+      const text = await file.text();
+      await createDriveFileRaw(file.name, targetFolder, text);
+      succeeded++;
+    } catch (err) {
+      failed.push(`${file.name} (${gErr(err)})`);
+    }
+  }
+
+  delete treeCache[targetFolder];
+  await renderTree();
+
+  if (failed.length === 0) {
+    showToast(`✓ Imported ${succeeded} file${succeeded === 1 ? '' : 's'}`);
+  } else {
+    showToast(`Imported ${succeeded}/${files.length} — failed: ${failed.join(', ')}`, 8000);
+    console.warn('[import] Failed files:', failed);
   }
 });
 
