@@ -424,9 +424,16 @@ async function ensureRootFolder() {
   return driveRootFolderId;
 }
 
-// ── Drive Picker: grants drive.file access to a folder (and its existing
-// contents) that the user selects, e.g. files they dropped into "Em Dash"
-// via drive.google.com directly instead of creating them through the app. ──
+// ── Drive Picker: grants drive.file access to specific files/folders the
+// user selects, e.g. files they dropped into "Em Dash" via drive.google.com
+// directly instead of creating them through the app.
+//
+// IMPORTANT: drive.file access is granted per item, not per folder. Picking
+// a folder here only grants access to the folder object itself (so the app
+// can e.g. create new files in it) — it does NOT cascade to files already
+// sitting inside it. So this picker starts already browsing inside "Em
+// Dash" and lets the user multi-select the individual files to grant access
+// to, rather than selecting the folder once. ──
 let pickerLibLoaded = false;
 function ensurePickerLib() {
   return new Promise((resolve, reject) => {
@@ -441,7 +448,7 @@ function ensurePickerLib() {
 
 async function openDriveFolderSyncPicker() {
   document.getElementById('hdr-more-menu').classList.remove('open');
-  if (!driveConnected) return;
+  if (!driveConnected || !driveRootFolderId) return;
   const token = gapi.client.getToken();
   if (!token || !token.access_token) { showToast('Reconnect Google Drive first', 4000); return; }
   try {
@@ -450,14 +457,18 @@ async function openDriveFolderSyncPicker() {
     showToast('Could not load Google Picker: ' + gErr(e), 5000);
     return;
   }
-  const view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
-    .setSelectFolderEnabled(true)
+  // Browse starting inside the Em Dash folder itself, showing files and
+  // subfolders, with multi-select so the user can grant access to everything
+  // added outside the app in one pass (Ctrl/Cmd-click, or drag a selection).
+  const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
     .setIncludeFolders(true)
-    .setParent('root');
+    .setSelectFolderEnabled(true)
+    .setParent(driveRootFolderId);
   const picker = new google.picker.PickerBuilder()
     .setOAuthToken(token.access_token)
     .setDeveloperKey(GOOGLE_API_KEY)
-    .setTitle('Select your "' + DRIVE_ROOT_FOLDER_NAME + '" folder to grant access to files added outside the app')
+    .setTitle('Select the files (Ctrl/Cmd-click for multiple) to sync into Em Dash')
+    .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
     .addView(view)
     .setCallback(handleDriveFolderSyncPicked)
     .build();
@@ -466,20 +477,15 @@ async function openDriveFolderSyncPicker() {
 
 async function handleDriveFolderSyncPicked(data) {
   if (data[google.picker.Response.ACTION] !== google.picker.Action.PICKED) return;
-  const doc = data[google.picker.Response.DOCUMENTS][0];
-  const pickedId = doc[google.picker.Document.ID];
-  if (pickedId !== driveRootFolderId) {
-    showToast('Please pick the "' + DRIVE_ROOT_FOLDER_NAME + '" folder itself (not a different folder) so the app can see its existing files.', 6000);
-    return;
-  }
-  showToast('✓ Access granted — refreshing…');
+  const docs = data[google.picker.Response.DOCUMENTS] || [];
+  if (!docs.length) return;
+  showToast('✓ Granted access to ' + docs.length + ' item' + (docs.length === 1 ? '' : 's') + ' — refreshing…');
   try {
-    // Selecting a folder via Picker grants drive.file visibility into
-    // everything already inside it, so a fresh listing now includes files
-    // that were never created or opened through the app.
+    // Each picked item is now individually authorized under drive.file, so
+    // a fresh listing of the folder will include it.
     treeCache = {};
     await renderTree();
-    showToast('✓ Existing Drive files are now visible');
+    showToast('✓ Synced ' + docs.length + ' item' + (docs.length === 1 ? '' : 's') + ' from Drive');
   } catch (e) {
     showToast('Synced, but refreshing the tree failed: ' + gErr(e), 5000);
   }

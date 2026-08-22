@@ -9,7 +9,7 @@ A Notion-style markdown editor that lives entirely in your browser and stores ev
 - **Drag-and-drop organization** — drag a file or folder onto another folder to move/re-nest it (`files.update` with `addParents`/`removeParents`).
 - **Inline create, rename, delete** — "+" buttons in the sidebar header create a new file or folder inline (Notion-style, no modal); double-click a name (or use the small pencil icon) to rename in place; the trash icon deletes with a confirmation.
 - **Import / Export** — Import uploads a local `.md`/`.txt` file from disk straight into the currently-selected Drive folder. Export downloads the currently-open file back to disk as `.md`. These are the only ways local disk files enter or leave the app — there is no local disk *editing*.
-- **Sync Existing Drive Files** — because the app only holds the narrow `drive.file` scope, files placed into the "Em Dash" folder from Drive's own UI (rather than created through the app) are invisible until you grant access. The "…" menu's **Sync Existing Drive Files…** opens Google's file picker so you can select that folder and make its existing contents visible, without broadening the app's Drive permissions.
+- **Sync Existing Drive Files** — because the app only holds the narrow `drive.file` scope, files placed into the "Em Dash" folder from Drive's own UI (rather than created through the app) are invisible until you grant access. The "…" menu's **Sync Existing Drive Files…** opens Google's file picker, already browsing inside "Em Dash", so you can multi-select the specific files to grant access to — `drive.file` access is per-item, so each file has to be selected individually rather than the folder as a whole.
 - **Live preview** — markdown rendered as you type, with syntax-highlighted code blocks and one-click copy on fenced code.
 - **Focus mode** — distraction-free WYSIWYG writing with typewriter scrolling; converts back to markdown on exit.
 - **Find & replace** — with match navigation and replace-all.
@@ -29,10 +29,10 @@ Because storage is Google Drive only, Em Dash needs a working Google OAuth clien
 ### 1. Create Google Cloud credentials
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
-2. Create (or select) a project, then enable the **Google Drive API** (APIs & Services → Library).
+2. Create (or select) a project, then enable both the **Google Drive API** and the **Google Picker API** (APIs & Services → Library). The Picker API backs the **Sync Existing Drive Files…** feature — without it enabled (and allowlisted on your key, next step) that feature fails with "The API developer key is invalid."
 3. Create an **OAuth 2.0 Client ID** (Application type: *Web application*). Add the origin(s) you'll serve the app from (e.g. `http://localhost:8000`, your production URL) under **Authorized JavaScript origins**.
-4. Create an **API key** (APIs & Services → Credentials → Create Credentials → API key). Restrict it: **HTTP referrers** limited to your domain(s), and **API restrictions** limited to the Google Drive API.
-5. Note the OAuth scope the app requests: `https://www.googleapis.com/auth/drive.file`. This is a narrow, per-file scope — Em Dash can only see files and folders it creates or that you explicitly open through it, never your whole Drive. If you drop a file straight into the "Em Dash" folder from Drive's own UI, Em Dash won't see it until you use **"…" menu → Sync Existing Drive Files…**, which opens Google's file picker so you can grant access to that folder (and everything already in it) without widening the app's Drive permissions.
+4. Create an **API key** (APIs & Services → Credentials → Create Credentials → API key). Restrict it: **HTTP referrers** limited to your domain(s), and **API restrictions** limited to the Google Drive API and Google Picker API.
+5. Note the OAuth scope the app requests: `https://www.googleapis.com/auth/drive.file`. This is a narrow, per-file scope — Em Dash can only see files and folders it creates, or that you explicitly select through Google's file picker, never your whole Drive. If you drop a file straight into the "Em Dash" folder from Drive's own UI, Em Dash won't see it until you use **"…" menu → Sync Existing Drive Files…** and select it (or select several at once) in the picker that opens; access is granted per file, so picking the "Em Dash" folder itself does not make its existing contents visible — only the individual files you select are.
 
 ### 2. Configure the app
 
