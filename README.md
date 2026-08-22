@@ -16,7 +16,10 @@ A Notion-style markdown editor that lives entirely in your browser and stores ev
 - **Auto-save** — saves two seconds after you stop typing, straight to the open Drive file.
 - **Offline** — installable as a PWA; the app shell works without a connection (Drive sync obviously needs one).
 - **Three themes** — Lokai (dark editor, light preview), Dark, and Light. Persisted across sessions.
-- **Sidebar sort order** — a toggle button in the sidebar header switches between A→Z and Z→A name order. Because filenames use ISO date prefixes, this doubles as a date sort (oldest-first / newest-first).
+- **Sidebar sort order** — a toggle button in the sidebar header switches between Z→A and A→Z name order (Z→A by default, so ISO-date filenames show newest first). The sidebar also shows a count badge on each folder once expanded.
+- **Recently opened files** — a collapsible "Recent" section at the top of the sidebar lists the last 8 files you opened, persisted across sessions. Click the header to collapse or expand it.
+- **Open in Drive** — a small ↗ icon in the status bar links directly to the current file in drive.google.com.
+- **Database view** — hover any subfolder and click the table icon to open it as a spreadsheet. Each `.md` file becomes a row; YAML frontmatter keys become columns (auto-detected). Text cells are editable inline, booleans render as checkboxes, and arrays render as tags. Modified date and file size are always shown as system columns. Click a title to open the file; click any column header to sort.
 - Line numbers, word/character count, adjustable zoom, and light keyboard shortcuts.
 
 ## Tech
@@ -66,6 +69,16 @@ To use it:
 Remember to add your Pages URL to the API key's referrer restrictions and to your OAuth client's authorized JavaScript origins.
 
 ## Changelog
+
+### v3.5.0
+
+- **Database view** — hover any subfolder and click the table icon to open it as a spreadsheet. `.md` files become rows, YAML frontmatter keys become columns. Text cells edit inline, booleans render as checkboxes, arrays as tag chips. Modified date and file size are always present as system columns. Sortable by any column header. "+ New Row" creates a blank `.md` file in the folder.
+- **Recently opened files** — collapsible "Recent" section at the top of the sidebar, last 8 files, persisted in localStorage. Click the header chevron to collapse or expand.
+- **Open in Drive link** — ↗ icon in the status bar opens the current file directly in drive.google.com.
+- **Folder item count** — expanded folders show a muted count badge next to the folder name.
+- **Z→A default sort** — sidebar tree and database view both default to descending name order so ISO-date filenames show newest first.
+- **UI font size 14px** — increased from 13px across all UI elements.
+- **Fixed find bar focus** — the search box no longer lost focus after the first keystroke.
 
 ### v3.2.0
 
