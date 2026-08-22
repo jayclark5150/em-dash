@@ -25,6 +25,8 @@ const DISCOVERY_DOC    = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/
 const DRIVE_ROOT_FOLDER_NAME = APP_CONFIG.DRIVE_ROOT_FOLDER_NAME || 'Em Dash';
 const FOLDER_MIME       = 'application/vnd.google-apps.folder';
 const ROOT_FOLDER_ID_KEY = 'emdash-root-folder-id';
+const RECENTS_KEY        = 'emdash-recents';
+const RECENTS_MAX        = 8;
 
 // Validate credentials are present
 function validateCredentials() {
@@ -76,6 +78,7 @@ let expandedFolders  = new Set();     // folder ids currently expanded in the si
 let selectedFolderId = null;          // target folder for New File / New Folder / Import
 let childrenElMap    = {};            // folderId -> DOM container for its children
 let nodeDepthMap     = {};            // folderId -> nesting depth (root's children = 0)
+let folderCountElMap = {};            // folderId -> count badge span
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const editor         = document.getElementById('editor');
@@ -357,6 +360,7 @@ function createNewDoc() {
   isDirty           = false;
   saveStatus.textContent    = '';
   driveFileInfo.textContent = driveConnected ? '☁ Drive (new)' : '';
+  updateDriveLink(null);
   setActiveTreeRow(null);
   renderPreview(); updateStats(); updateCursor(); updateLineNumbers();
 }
@@ -439,6 +443,7 @@ async function onDriveConnected() {
   document.getElementById('hdr-drive-connect').style.display  = 'none';
   document.getElementById('hdr-drive-signout').style.display  = '';
   if (!driveFileId) driveFileInfo.textContent = '☁ Drive (new)';
+  renderRecents();
   showToast('✓ Connected to Google Drive');
   try {
     await ensureRootFolder();
@@ -480,10 +485,62 @@ document.getElementById('hdr-drive-signout').addEventListener('click', () => {
   document.getElementById('hdr-drive-connect').style.display  = '';
   document.getElementById('hdr-drive-signout').style.display  = 'none';
   driveFileInfo.textContent = '';
+  updateDriveLink(null);
+  renderRecents();
   document.getElementById('sidebar-folder-name').textContent = DRIVE_ROOT_FOLDER_NAME;
   fileTreeEl.innerHTML = '<div class="sidebar-empty">Connect Google Drive to see your files.</div>';
   showToast('Signed out of Google Drive');
 });
+
+// ── Recently opened files ─────────────────────────────────────────────────────
+function getRecents() {
+  try { return JSON.parse(localStorage.getItem(RECENTS_KEY)) || []; } catch (_) { return []; }
+}
+function addToRecents(id, name, parentId) {
+  let list = getRecents().filter(r => r.id !== id);
+  list.unshift({ id, name, parentId });
+  if (list.length > RECENTS_MAX) list = list.slice(0, RECENTS_MAX);
+  try { localStorage.setItem(RECENTS_KEY, JSON.stringify(list)); } catch (_) {}
+  renderRecents();
+}
+function renderRecents() {
+  const section = document.getElementById('recent-section');
+  if (!section) return;
+  const list = driveConnected ? getRecents() : [];
+  if (!list.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  const listEl = section.querySelector('.recent-list');
+  listEl.innerHTML = '';
+  list.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'tree-item recent-item' + (driveFileId === r.id ? ' active' : '');
+    row.style.paddingLeft = '26px';
+    const icon = document.createElement('span');
+    icon.className = 'tree-icon';
+    icon.textContent = '📄';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'tree-name';
+    nameEl.textContent = r.name;
+    row.append(icon, nameEl);
+    row.addEventListener('click', () => {
+      if (isDirty && !confirm('You have unsaved changes. Open this file anyway?')) return;
+      loadDriveFile(r.id, r.name, r.parentId);
+    });
+    listEl.appendChild(row);
+  });
+}
+
+// ── Open in Drive link ────────────────────────────────────────────────────────
+function updateDriveLink(fileId) {
+  const link = document.getElementById('drive-open-link');
+  if (!link) return;
+  if (fileId) {
+    link.href = 'https://drive.google.com/file/d/' + fileId + '/view';
+    link.style.display = '';
+  } else {
+    link.style.display = 'none';
+  }
+}
 
 async function loadDriveFile(fileId, fileName, parentId) {
   try {
@@ -499,6 +556,8 @@ async function loadDriveFile(fileId, fileName, parentId) {
     driveFileInfo.textContent = '☁ Google Drive';
     setDriveStatus('connected', 'Drive connected');
     renderPreview(); updateStats(); updateCursor(); updateLineNumbers();
+    addToRecents(fileId, fileName, driveFileParentId);
+    updateDriveLink(fileId);
     showToast('✓ Opened ' + fileName);
   } catch (e) {
     setDriveStatus('error', 'Load failed');
@@ -1099,8 +1158,9 @@ async function fetchFolderChildren(folderId) {
 
 async function renderTree() {
   fileTreeEl.innerHTML = '';
-  childrenElMap = {};
-  nodeDepthMap  = {};
+  childrenElMap    = {};
+  nodeDepthMap     = {};
+  folderCountElMap = {};
   if (!driveConnected || !driveRootFolderId) {
     fileTreeEl.innerHTML = '<div class="sidebar-empty">Connect Google Drive to see your files.</div>';
     return;
@@ -1126,6 +1186,11 @@ async function renderFolderContents(folderId, containerEl, depth) {
   containerEl.innerHTML = '';
   entry.folders.forEach(f => containerEl.appendChild(buildFolderRow(f, depth)));
   entry.files.forEach(f => containerEl.appendChild(buildFileRow(f, depth)));
+  const countEl = folderCountElMap[folderId];
+  if (countEl) {
+    const n = entry.folders.length + entry.files.length;
+    countEl.textContent = n ? n : '';
+  }
 }
 
 function highlightOpenFileInTree() {
@@ -1228,6 +1293,10 @@ function buildFolderRow(node, depth) {
   nameEl.className = 'tree-name';
   nameEl.textContent = node.name;
 
+  const countEl = document.createElement('span');
+  countEl.className = 'tree-count';
+  folderCountElMap[node.id] = countEl;
+
   const childrenEl = document.createElement('div');
   childrenEl.className = 'tree-children';
   childrenEl.style.display = expandedFolders.has(node.id) ? '' : 'none';
@@ -1235,7 +1304,7 @@ function buildFolderRow(node, depth) {
   nodeDepthMap[node.id]  = depth;
 
   const actions = buildRowActions(() => node, true, () => row);
-  row.append(chevron, icon, nameEl, actions);
+  row.append(chevron, icon, nameEl, countEl, actions);
 
   row.addEventListener('click', async (e) => {
     if (e.target.closest('.tree-row-actions')) return;

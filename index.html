@@ -254,6 +254,11 @@
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.35 2.65a7 7 0 1 0 1.72 6.85.5.5 0 1 0-.96-.3 6 6 0 1 1-1.48-5.84L11 4.99h4V1z"/></svg>
       </button>
     </div>
+    <div id="recent-section" style="display:none">
+      <div class="recent-header">Recent</div>
+      <div class="recent-list"></div>
+      <div class="recent-divider"></div>
+    </div>
     <div id="file-tree">
       <div class="sidebar-empty">Connect Google Drive to see your files.</div>
     </div>
@@ -283,13 +288,16 @@
 
 <!-- Status bar -->
 <div id="statusbar">
-  <span id="app-version">v3.0.0</span>
+  <span id="app-version">v3.3.0</span>
   <span id="word-count">Words: 0</span>
   <span id="char-count">Chars: 0</span>
   <span id="cursor-pos">Ln 1, Col 1</span>
   <span style="flex:1"></span>
   <span id="save-status"></span>
   <span id="drive-file-info"></span>
+  <a id="drive-open-link" href="#" target="_blank" rel="noopener" title="Open in Google Drive" style="display:none">
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z"/></svg>
+  </a>
 </div>
 
 <!-- New file modal -->
