@@ -424,12 +424,74 @@ async function ensureRootFolder() {
   return driveRootFolderId;
 }
 
+// ── Drive Picker: grants drive.file access to a folder (and its existing
+// contents) that the user selects, e.g. files they dropped into "Em Dash"
+// via drive.google.com directly instead of creating them through the app. ──
+let pickerLibLoaded = false;
+function ensurePickerLib() {
+  return new Promise((resolve, reject) => {
+    if (pickerLibLoaded && window.google && google.picker) { resolve(); return; }
+    if (!window.gapi) { reject(new Error('Google API library not loaded')); return; }
+    gapi.load('picker', {
+      callback: () => { pickerLibLoaded = true; resolve(); },
+      onerror: () => reject(new Error('Failed to load Google Picker')),
+    });
+  });
+}
+
+async function openDriveFolderSyncPicker() {
+  document.getElementById('hdr-more-menu').classList.remove('open');
+  if (!driveConnected) return;
+  const token = gapi.client.getToken();
+  if (!token || !token.access_token) { showToast('Reconnect Google Drive first', 4000); return; }
+  try {
+    await ensurePickerLib();
+  } catch (e) {
+    showToast('Could not load Google Picker: ' + gErr(e), 5000);
+    return;
+  }
+  const view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+    .setSelectFolderEnabled(true)
+    .setIncludeFolders(true)
+    .setParent('root');
+  const picker = new google.picker.PickerBuilder()
+    .setOAuthToken(token.access_token)
+    .setDeveloperKey(GOOGLE_API_KEY)
+    .setTitle('Select your "' + DRIVE_ROOT_FOLDER_NAME + '" folder to grant access to files added outside the app')
+    .addView(view)
+    .setCallback(handleDriveFolderSyncPicked)
+    .build();
+  picker.setVisible(true);
+}
+
+async function handleDriveFolderSyncPicked(data) {
+  if (data[google.picker.Response.ACTION] !== google.picker.Action.PICKED) return;
+  const doc = data[google.picker.Response.DOCUMENTS][0];
+  const pickedId = doc[google.picker.Document.ID];
+  if (pickedId !== driveRootFolderId) {
+    showToast('Please pick the "' + DRIVE_ROOT_FOLDER_NAME + '" folder itself (not a different folder) so the app can see its existing files.', 6000);
+    return;
+  }
+  showToast('✓ Access granted — refreshing…');
+  try {
+    // Selecting a folder via Picker grants drive.file visibility into
+    // everything already inside it, so a fresh listing now includes files
+    // that were never created or opened through the app.
+    treeCache = {};
+    await renderTree();
+    showToast('✓ Existing Drive files are now visible');
+  } catch (e) {
+    showToast('Synced, but refreshing the tree failed: ' + gErr(e), 5000);
+  }
+}
+
 async function onDriveConnected() {
   driveConnected = true;
   setDriveStatus('connected', 'Drive connected');
-  // Header dropdown: hide "Connect", reveal "Sign out"
+  // Header dropdown: hide "Connect", reveal "Sign out" + "Sync"
   document.getElementById('hdr-drive-connect').style.display  = 'none';
   document.getElementById('hdr-drive-signout').style.display  = '';
+  document.getElementById('hdr-drive-sync').style.display     = '';
   if (!driveFileId) driveFileInfo.textContent = '☁ Drive (new)';
   showToast('✓ Connected to Google Drive');
   try {
@@ -455,6 +517,10 @@ document.getElementById('hdr-drive-connect').addEventListener('click', () => {
   client.requestAccessToken({ prompt: 'consent' });
 });
 
+document.getElementById('hdr-drive-sync').addEventListener('click', () => {
+  openDriveFolderSyncPicker();
+});
+
 document.getElementById('hdr-drive-signout').addEventListener('click', () => {
   document.getElementById('hdr-more-menu').classList.remove('open');
   const token = gapi.client.getToken();
@@ -471,6 +537,7 @@ document.getElementById('hdr-drive-signout').addEventListener('click', () => {
   setDriveStatus('', 'Not connected to Drive');
   document.getElementById('hdr-drive-connect').style.display  = '';
   document.getElementById('hdr-drive-signout').style.display  = 'none';
+  document.getElementById('hdr-drive-sync').style.display     = 'none';
   driveFileInfo.textContent = '';
   document.getElementById('sidebar-folder-name').textContent = DRIVE_ROOT_FOLDER_NAME;
   fileTreeEl.innerHTML = '<div class="sidebar-empty">Connect Google Drive to see your files.</div>';
