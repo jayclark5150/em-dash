@@ -613,7 +613,9 @@ body {
 .db-bool-cell  { text-align: center; }
 .db-text-cell  { cursor: text; color: var(--text); }
 .db-text-cell:hover { background: var(--bg3) !important; }
-.db-tags-cell  { }
+.db-tags-cell  { cursor: pointer; }
+.db-tags-cell:hover { background: var(--bg3) !important; }
+.db-tags-placeholder { color: var(--text2); opacity: .35; font-size: 12px; }
 .db-tag {
   display: inline-block;
   background: var(--bg3);

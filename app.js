@@ -546,10 +546,12 @@ function formatDbSize(bytes) {
   return (n / 1048576).toFixed(1) + ' MB';
 }
 
+const DB_SYSTEM_COLS = new Set(['title', 'tags']);
+
 function inferDbCols(rows) {
   const freq = {};
   rows.forEach(r => Object.keys(r.data).forEach(k => {
-    if (k !== 'title') freq[k] = (freq[k] || 0) + 1;
+    if (!DB_SYSTEM_COLS.has(k)) freq[k] = (freq[k] || 0) + 1;
   }));
   return Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
 }
@@ -629,8 +631,8 @@ function closeDatabaseView() {
 function renderDbTable() {
   const thead = document.getElementById('db-thead');
   const tbody = document.getElementById('db-tbody');
-  const cols  = ['title', ...dbCols, 'modified', 'size'];
-  const colLabel = { title: 'Title', modified: 'Modified', size: 'Size' };
+  const cols  = ['title', 'tags', ...dbCols, 'modified', 'size'];
+  const colLabel = { title: 'Title', tags: 'Tags', modified: 'Modified', size: 'Size' };
 
   // Header row
   thead.innerHTML = '';
@@ -658,6 +660,7 @@ function renderDbTable() {
   const sorted = [...dbRows].sort((a, b) => {
     let av, bv;
     if      (dbSortKey === 'title')    { av = a.data.title || a.name; bv = b.data.title || b.name; }
+    else if (dbSortKey === 'tags')     { av = (a.data.tags || []).join(','); bv = (b.data.tags || []).join(','); }
     else if (dbSortKey === 'modified') { av = a.modifiedTime || ''; bv = b.modifiedTime || ''; }
     else if (dbSortKey === 'size')     { av = Number(a.size || 0);   bv = Number(b.size || 0); }
     else                               { av = a.data[dbSortKey] ?? ''; bv = b.data[dbSortKey] ?? ''; }
@@ -694,6 +697,11 @@ function renderDbTable() {
           closeDatabaseView();
           loadDriveFile(row.id, row.name, fid || driveRootFolderId);
         });
+      } else if (col === 'tags') {
+        td.className = 'db-tags-cell';
+        const tags = Array.isArray(row.data.tags) ? row.data.tags : [];
+        renderTagChips(td, tags);
+        td.addEventListener('click', () => startTagsCellEdit(td, row, tags));
       } else if (col === 'modified') {
         td.className = 'db-meta-cell';
         td.textContent = formatDbDate(row.modifiedTime);
@@ -711,11 +719,7 @@ function renderDbTable() {
           td.appendChild(cb);
         } else if (Array.isArray(val)) {
           td.className = 'db-tags-cell';
-          (val || []).forEach(tag => {
-            const chip = document.createElement('span');
-            chip.className = 'db-tag'; chip.textContent = tag;
-            td.appendChild(chip);
-          });
+          renderTagChips(td, val);
         } else {
           td.className = 'db-text-cell';
           td.textContent = val ?? '';
@@ -751,6 +755,47 @@ function startAddDbColumn() {
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
     if (e.key === 'Escape') { done = true; renderDbTable(); }
+  });
+}
+
+function renderTagChips(td, tags) {
+  td.textContent = '';
+  if (!tags.length) {
+    const placeholder = document.createElement('span');
+    placeholder.className = 'db-tags-placeholder';
+    placeholder.textContent = 'Add tags…';
+    td.appendChild(placeholder);
+    return;
+  }
+  tags.forEach(tag => {
+    const chip = document.createElement('span');
+    chip.className = 'db-tag'; chip.textContent = tag;
+    td.appendChild(chip);
+  });
+}
+
+function startTagsCellEdit(td, row, currentTags) {
+  if (td.querySelector('input')) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentTags.join(', ');
+  input.placeholder = 'tag1, tag2, …';
+  input.className = 'db-cell-input';
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus(); input.select();
+  let committed = false;
+  const commit = async () => {
+    if (committed) return; committed = true;
+    const newTags = input.value.split(',').map(t => t.trim()).filter(Boolean);
+    const changed = JSON.stringify(newTags) !== JSON.stringify(currentTags);
+    if (changed) await dbSaveCell(row, 'tags', newTags.length ? newTags : undefined);
+    else renderDbTable();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { committed = true; renderDbTable(); }
   });
 }
 
