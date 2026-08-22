@@ -1064,13 +1064,29 @@ function isMarkdownLikeFile(f) {
          /\.(md|markdown|txt)$/i.test(f.name || '');
 }
 
+let sortDesc = false;
+
+function updateSortBtn() {
+  const btn = document.getElementById('sidebar-sort-btn');
+  if (!btn) return;
+  btn.title = sortDesc ? 'Sort: Z → A' : 'Sort: A → Z';
+}
+
+document.getElementById('sidebar-sort-btn').addEventListener('click', async () => {
+  sortDesc = !sortDesc;
+  updateSortBtn();
+  treeCache = {};
+  await renderTree();
+});
+
 async function fetchFolderChildren(folderId) {
   const q = `'${folderId}' in parents and trashed=false`;
+  const orderBy = sortDesc ? 'folder,name desc' : 'folder,name';
   const items = [];
   let pageToken;
   do {
     const res = await gapi.client.drive.files.list({
-      q, fields: 'nextPageToken, files(id,name,mimeType,parents)', orderBy: 'folder,name',
+      q, fields: 'nextPageToken, files(id,name,mimeType,parents)', orderBy,
       pageSize: 1000, pageToken
     });
     items.push(...(res.result.files || []));
