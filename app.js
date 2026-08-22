@@ -12,7 +12,15 @@
 const APP_CONFIG       = window.APP_CONFIG || {};
 const GOOGLE_CLIENT_ID = APP_CONFIG.GOOGLE_CLIENT_ID || '';
 const GOOGLE_API_KEY   = APP_CONFIG.GOOGLE_API_KEY   || '';
-const SCOPES           = 'https://www.googleapis.com/auth/drive.file';
+// Full Drive scope: at real-world scale (users with hundreds of pre-existing
+// files in their "Em Dash" folder), the narrow drive.file scope requires
+// individually granting access to every file via the Picker, which does not
+// scale. drive.file access is per-item and does not cascade from a selected
+// folder to its existing children — see git history for the abandoned
+// per-file-Picker-grant approach. The app still only reads/writes within the
+// "Em Dash" folder subtree by its own logic, even though this scope grants
+// broader technical access to the account's Drive.
+const SCOPES            = 'https://www.googleapis.com/auth/drive';
 const DISCOVERY_DOC    = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 const DRIVE_ROOT_FOLDER_NAME = APP_CONFIG.DRIVE_ROOT_FOLDER_NAME || 'Em Dash';
 const FOLDER_MIME       = 'application/vnd.google-apps.folder';
@@ -424,80 +432,12 @@ async function ensureRootFolder() {
   return driveRootFolderId;
 }
 
-// ── Drive Picker: grants drive.file access to specific files/folders the
-// user selects, e.g. files they dropped into "Em Dash" via drive.google.com
-// directly instead of creating them through the app.
-//
-// IMPORTANT: drive.file access is granted per item, not per folder. Picking
-// a folder here only grants access to the folder object itself (so the app
-// can e.g. create new files in it) — it does NOT cascade to files already
-// sitting inside it. So this picker starts already browsing inside "Em
-// Dash" and lets the user multi-select the individual files to grant access
-// to, rather than selecting the folder once. ──
-let pickerLibLoaded = false;
-function ensurePickerLib() {
-  return new Promise((resolve, reject) => {
-    if (pickerLibLoaded && window.google && google.picker) { resolve(); return; }
-    if (!window.gapi) { reject(new Error('Google API library not loaded')); return; }
-    gapi.load('picker', {
-      callback: () => { pickerLibLoaded = true; resolve(); },
-      onerror: () => reject(new Error('Failed to load Google Picker')),
-    });
-  });
-}
-
-async function openDriveFolderSyncPicker() {
-  document.getElementById('hdr-more-menu').classList.remove('open');
-  if (!driveConnected || !driveRootFolderId) return;
-  const token = gapi.client.getToken();
-  if (!token || !token.access_token) { showToast('Reconnect Google Drive first', 4000); return; }
-  try {
-    await ensurePickerLib();
-  } catch (e) {
-    showToast('Could not load Google Picker: ' + gErr(e), 5000);
-    return;
-  }
-  // Browse starting inside the Em Dash folder itself, showing files and
-  // subfolders, with multi-select so the user can grant access to everything
-  // added outside the app in one pass (Ctrl/Cmd-click, or drag a selection).
-  const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-    .setIncludeFolders(true)
-    .setSelectFolderEnabled(true)
-    .setParent(driveRootFolderId);
-  const picker = new google.picker.PickerBuilder()
-    .setOAuthToken(token.access_token)
-    .setDeveloperKey(GOOGLE_API_KEY)
-    .setTitle('Select the files (Ctrl/Cmd-click for multiple) to sync into Em Dash')
-    .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-    .addView(view)
-    .setCallback(handleDriveFolderSyncPicked)
-    .build();
-  picker.setVisible(true);
-}
-
-async function handleDriveFolderSyncPicked(data) {
-  if (data[google.picker.Response.ACTION] !== google.picker.Action.PICKED) return;
-  const docs = data[google.picker.Response.DOCUMENTS] || [];
-  if (!docs.length) return;
-  showToast('✓ Granted access to ' + docs.length + ' item' + (docs.length === 1 ? '' : 's') + ' — refreshing…');
-  try {
-    // Each picked item is now individually authorized under drive.file, so
-    // a fresh listing of the folder will include it.
-    treeCache = {};
-    await renderTree();
-    showToast('✓ Synced ' + docs.length + ' item' + (docs.length === 1 ? '' : 's') + ' from Drive');
-  } catch (e) {
-    showToast('Synced, but refreshing the tree failed: ' + gErr(e), 5000);
-  }
-}
-
 async function onDriveConnected() {
   driveConnected = true;
   setDriveStatus('connected', 'Drive connected');
   // Header dropdown: hide "Connect", reveal "Sign out" + "Sync"
   document.getElementById('hdr-drive-connect').style.display  = 'none';
   document.getElementById('hdr-drive-signout').style.display  = '';
-  document.getElementById('hdr-drive-sync').style.display     = '';
   if (!driveFileId) driveFileInfo.textContent = '☁ Drive (new)';
   showToast('✓ Connected to Google Drive');
   try {
@@ -523,10 +463,6 @@ document.getElementById('hdr-drive-connect').addEventListener('click', () => {
   client.requestAccessToken({ prompt: 'consent' });
 });
 
-document.getElementById('hdr-drive-sync').addEventListener('click', () => {
-  openDriveFolderSyncPicker();
-});
-
 document.getElementById('hdr-drive-signout').addEventListener('click', () => {
   document.getElementById('hdr-more-menu').classList.remove('open');
   const token = gapi.client.getToken();
@@ -543,7 +479,6 @@ document.getElementById('hdr-drive-signout').addEventListener('click', () => {
   setDriveStatus('', 'Not connected to Drive');
   document.getElementById('hdr-drive-connect').style.display  = '';
   document.getElementById('hdr-drive-signout').style.display  = 'none';
-  document.getElementById('hdr-drive-sync').style.display     = 'none';
   driveFileInfo.textContent = '';
   document.getElementById('sidebar-folder-name').textContent = DRIVE_ROOT_FOLDER_NAME;
   fileTreeEl.innerHTML = '<div class="sidebar-empty">Connect Google Drive to see your files.</div>';
@@ -1131,10 +1066,16 @@ function isMarkdownLikeFile(f) {
 
 async function fetchFolderChildren(folderId) {
   const q = `'${folderId}' in parents and trashed=false`;
-  const res = await gapi.client.drive.files.list({
-    q, fields: 'files(id,name,mimeType,parents)', orderBy: 'folder,name', pageSize: 200
-  });
-  const items = res.result.files || [];
+  const items = [];
+  let pageToken;
+  do {
+    const res = await gapi.client.drive.files.list({
+      q, fields: 'nextPageToken, files(id,name,mimeType,parents)', orderBy: 'folder,name',
+      pageSize: 1000, pageToken
+    });
+    items.push(...(res.result.files || []));
+    pageToken = res.result.nextPageToken;
+  } while (pageToken);
   const folders = items.filter(f => f.mimeType === FOLDER_MIME);
   const files   = items.filter(f => f.mimeType !== FOLDER_MIME && isMarkdownLikeFile(f));
   const entry = { folders, files };
