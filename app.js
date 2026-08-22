@@ -2030,6 +2030,64 @@ document.getElementById('hdr-export-btn').addEventListener('click', () => {
   document.getElementById('hdr-more-menu').classList.remove('open');
   exportCurrentFile();
 });
+document.getElementById('hdr-export-pdf-btn').addEventListener('click', () => {
+  document.getElementById('hdr-more-menu').classList.remove('open');
+  exportAsPdf();
+});
+
+// ── PDF export ────────────────────────────────────────────────────────────────
+function exportAsPdf() {
+  const content = previewInner.innerHTML;
+  if (!content.trim()) { showToast('Nothing to export'); return; }
+
+  const title = driveFileName
+    ? driveFileName.replace(/\.(md|markdown|txt)$/i, '')
+    : (currentTitle || 'document');
+
+  const printWin = window.open('', '_blank', 'width=900,height=700');
+  if (!printWin) { showToast('Pop-up blocked — allow pop-ups and try again'); return; }
+
+  printWin.document.write(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${title.replace(/</g, '&lt;')}</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/github.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:11pt;line-height:1.65;color:#1a1a1a;max-width:740px;margin:0 auto;padding:32px 28px}
+h1,h2,h3,h4,h5,h6{line-height:1.25;margin:1.4em 0 .45em;font-weight:600}
+h1{font-size:22pt;border-bottom:2px solid #e0e0e0;padding-bottom:.3em;margin-top:.5em}
+h2{font-size:16pt;border-bottom:1px solid #e0e0e0;padding-bottom:.2em}
+h3{font-size:13pt}h4{font-size:11.5pt}h5,h6{font-size:11pt}
+p{margin:0 0 .75em}
+a{color:#0969da}
+code{font-family:'SF Mono','Fira Code',Menlo,Consolas,monospace;font-size:9.5pt;background:#f6f8fa;padding:2px 6px;border-radius:4px;border:1px solid #e0e0e0}
+pre{background:#f6f8fa;border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;overflow:visible;white-space:pre-wrap;word-break:break-all;margin:.75em 0}
+pre code{background:none;padding:0;font-size:9pt;border:none;border-radius:0}
+blockquote{border-left:4px solid #d0d7de;margin:.75em 0;padding:.1em 1em;color:#57606a}
+table{border-collapse:collapse;width:100%;margin:.75em 0}
+th,td{border:1px solid #d0d7de;padding:6px 14px;text-align:left}
+th{background:#f6f8fa;font-weight:600}
+tr:nth-child(even) td{background:#fafafa}
+img{max-width:100%;height:auto}
+hr{border:none;border-top:2px solid #e0e0e0;margin:1.5em 0}
+ul,ol{padding-left:1.8em;margin:0 0 .75em}
+li{margin:.2em 0}
+@media print{
+  body{padding:0}
+  pre{white-space:pre-wrap;page-break-inside:avoid}
+  h1,h2,h3{page-break-after:avoid}
+  table,figure{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>${content}</body>
+</html>`);
+  printWin.document.close();
+  printWin.focus();
+  setTimeout(() => { printWin.print(); printWin.close(); }, 400);
+}
 
 // ── Header bar delegation ─────────────────────────────────────────────────────
 document.getElementById('hdr-more-btn').addEventListener('click', (e) => {
