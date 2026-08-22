@@ -467,7 +467,11 @@ body {
   text-transform: uppercase;
   color: var(--text2);
   opacity: .7;
+  cursor: pointer;
+  user-select: none;
 }
+.recent-header:hover { opacity: 1; }
+#recent-chevron { font-size: 9px; }
 .recent-divider { height: 1px; background: var(--border); margin: 4px 0 2px; }
 
 /* Open-in-Drive link in statusbar */

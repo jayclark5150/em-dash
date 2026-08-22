@@ -786,6 +786,14 @@ function addToRecents(id, name, parentId) {
   try { localStorage.setItem(RECENTS_KEY, JSON.stringify(list)); } catch (_) {}
   renderRecents();
 }
+let recentCollapsed = false;
+
+document.getElementById('recent-toggle').addEventListener('click', () => {
+  recentCollapsed = !recentCollapsed;
+  document.getElementById('recent-chevron').textContent = recentCollapsed ? '▸' : '▾';
+  document.querySelector('.recent-list').style.display = recentCollapsed ? 'none' : '';
+});
+
 function renderRecents() {
   const section = document.getElementById('recent-section');
   if (!section) return;
@@ -793,6 +801,7 @@ function renderRecents() {
   if (!list.length) { section.style.display = 'none'; return; }
   section.style.display = '';
   const listEl = section.querySelector('.recent-list');
+  listEl.style.display = recentCollapsed ? 'none' : '';
   listEl.innerHTML = '';
   list.forEach(r => {
     const row = document.createElement('div');
