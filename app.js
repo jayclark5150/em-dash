@@ -1,11 +1,10 @@
 // ── Config ────────────────────────────────────────────────────────────────────
 // Credentials are loaded from window.APP_CONFIG, which is populated by:
 // 1. config.js (local development - gitignored)
-// 2. GitHub Actions build process (production - injected from secrets)
-// 3. Environment variable fallback (if available)
+// 2. Vercel build step via build-config.js (production - reads from Environment Variables)
 //
 // For local development: Copy config.example.js to config.js and fill in your credentials.
-// For deployment: Credentials are injected at build time from GitHub Secrets.
+// For deployment: Set GOOGLE_CLIENT_ID and GOOGLE_API_KEY in Vercel Environment Variables.
 //
 // ⚠️ IMPORTANT: config.js is gitignored. Never commit actual credentials.
 
@@ -39,13 +38,13 @@ function validateCredentials() {
         'For local development:\n' +
         '1. Copy config.example.js to config.js\n' +
         '2. Replace PLACEHOLDER values with actual credentials from Google Cloud Console\n' +
-        '3. See CREDENTIAL_ROTATION_GUIDE.md for setup instructions\n\n' +
-        'For production: Credentials are injected at deploy time from GitHub Secrets.'
+        '3. See the Setup section in README.md\n\n' +
+        'For production: Credentials are injected at deploy time from Vercel Environment Variables.'
       );
     } else {
       console.error(
         '❌ Critical Error: Google credentials not found on production.\n' +
-        'This should not happen. Check that GitHub Secrets are configured correctly.'
+        'This should not happen. Check that Vercel Environment Variables are configured correctly.'
       );
       // Show user-friendly error
       document.body.innerHTML =

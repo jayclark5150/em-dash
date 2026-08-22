@@ -1,6 +1,6 @@
 # Em Dash
 
-A Notion-style markdown editor that lives entirely in your browser and stores every document in **Google Drive** — no other storage backend, no server, no database. Em Dash gives you a persistent folder tree in the sidebar, drag-and-drop organization, live preview, and a distraction-free focus mode, all as an installable offline-capable PWA.
+A markdown editor that lives entirely in your browser and stores every document in **Google Drive** — no other storage backend, no server, no database. Em Dash gives you a persistent folder tree in the sidebar, drag-and-drop organization, live preview, and a distraction-free focus mode, all as an installable offline-capable PWA.
 
 ## Features
 
@@ -8,7 +8,7 @@ A Notion-style markdown editor that lives entirely in your browser and stores ev
 - **Sees everything in the folder, including files added outside the app** — files you drop into "Em Dash" from Drive's own UI (rather than creating them through Em Dash) show up in the sidebar too, no extra step required.
 - **Persistent sidebar with a real folder tree** — expand/collapse nested folders, click a file to open it. The tree is backed by actual Drive folders via the Drive API v3 (not a flat file list), and paginates through the full folder contents rather than stopping at the first page.
 - **Drag-and-drop organization** — drag a file or folder onto another folder to move/re-nest it (`files.update` with `addParents`/`removeParents`).
-- **Inline create, rename, delete** — "+" buttons in the sidebar header create a new file or folder inline (Notion-style, no modal); double-click a name (or use the small pencil icon) to rename in place; the trash icon deletes with a confirmation.
+- **Inline create, rename, delete** — "+" buttons in the sidebar header create a new file or folder inline, without a modal; double-click a name (or use the small pencil icon) to rename in place; the trash icon deletes with a confirmation.
 - **Import / Export** — Import uploads a local `.md`/`.txt` file from disk straight into the currently-selected Drive folder. Export downloads the currently-open file back to disk as `.md`. These are the only ways local disk files enter or leave the app — there is no local disk *editing*.
 - **Live preview** — markdown rendered as you type, with syntax-highlighted code blocks and one-click copy on fenced code.
 - **Focus mode** — if you want to type and edit directly in the rendered view rather than in markdown source, open the `…` menu and choose **Focus Mode**. The preview becomes a full-screen rich-text editor (bold, italic, headings, lists all work inline) with typewriter scrolling that keeps the cursor centered. On exit it converts back to clean markdown automatically.
@@ -61,15 +61,15 @@ Open the local URL in Chrome or Edge, click **Connect Google Drive** from the "�
 
 ## Deployment
 
-The repo includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) that publishes to GitHub Pages. It generates `config.js` at deploy time from repository secrets, so credentials stay out of the repo source.
+The repo is configured for **Vercel**. `vercel.json` sets `build-config.js` as the build command, which reads `GOOGLE_CLIENT_ID`, `GOOGLE_API_KEY`, and optionally `DRIVE_ROOT_FOLDER_NAME` from Vercel's Environment Variables and writes them into `config.js` at deploy time. `config.js` is gitignored, so credentials never touch the repo.
 
-To use it:
+To deploy your own copy:
 
-1. Add repository secrets for `GOOGLE_CLIENT_ID` and `GOOGLE_API_KEY` (Settings → Secrets and variables → Actions).
-2. Set Pages to deploy from GitHub Actions (Settings → Pages → Source → GitHub Actions).
-3. Push to `main` — the workflow builds and deploys automatically.
+1. Import the repo into [Vercel](https://vercel.com).
+2. Add `GOOGLE_CLIENT_ID` and `GOOGLE_API_KEY` under Project Settings → Environment Variables.
+3. Push to `main` — Vercel builds and deploys automatically.
 
-Remember to add your Pages URL to the API key's referrer restrictions and to your OAuth client's authorized JavaScript origins.
+Remember to add your Vercel deployment URL to the API key's HTTP referrer restrictions and to your OAuth client's authorized JavaScript origins in the Google Cloud Console.
 
 ## Changelog
 
