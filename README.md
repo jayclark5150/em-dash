@@ -11,11 +11,12 @@ A Notion-style markdown editor that lives entirely in your browser and stores ev
 - **Inline create, rename, delete** — "+" buttons in the sidebar header create a new file or folder inline (Notion-style, no modal); double-click a name (or use the small pencil icon) to rename in place; the trash icon deletes with a confirmation.
 - **Import / Export** — Import uploads a local `.md`/`.txt` file from disk straight into the currently-selected Drive folder. Export downloads the currently-open file back to disk as `.md`. These are the only ways local disk files enter or leave the app — there is no local disk *editing*.
 - **Live preview** — markdown rendered as you type, with syntax-highlighted code blocks and one-click copy on fenced code.
-- **Focus mode** — distraction-free WYSIWYG writing with typewriter scrolling; converts back to markdown on exit.
+- **Focus mode** — if you want to type and edit directly in the rendered view rather than in markdown source, open the `…` menu and choose **Focus Mode**. The preview becomes a full-screen rich-text editor (bold, italic, headings, lists all work inline) with typewriter scrolling that keeps the cursor centered. On exit it converts back to clean markdown automatically.
 - **Find & replace** — with match navigation and replace-all.
 - **Auto-save** — saves two seconds after you stop typing, straight to the open Drive file.
 - **Offline** — installable as a PWA; the app shell works without a connection (Drive sync obviously needs one).
 - **Three themes** — Lokai (dark editor, light preview), Dark, and Light. Persisted across sessions.
+- **Sidebar sort order** — a toggle button in the sidebar header switches between A→Z and Z→A name order. Because filenames use ISO date prefixes, this doubles as a date sort (oldest-first / newest-first).
 - Line numbers, word/character count, adjustable zoom, and light keyboard shortcuts.
 
 ## Tech
@@ -65,6 +66,11 @@ To use it:
 Remember to add your Pages URL to the API key's referrer restrictions and to your OAuth client's authorized JavaScript origins.
 
 ## Changelog
+
+### v3.2.0
+
+- **Sidebar sort-direction toggle** — a button in the sidebar header switches between A→Z and Z→A name order; since filenames use ISO date prefixes this also serves as a date sort.
+- **README: clarified Focus Mode** — the feature bullet now explains that Focus Mode is how you type and edit directly in the rendered view, rather than in markdown source.
 
 ### v3.1.0
 
