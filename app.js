@@ -87,6 +87,7 @@ let dbRows       = [];   // [{id, name, data, body}] — one per .md file
 let dbCols       = [];   // frontmatter keys inferred from all rows
 let dbSortKey    = 'title';
 let dbSortAsc    = false;
+let dbRowCache   = {};   // folderId -> {rows, cols}; cleared alongside treeCache
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const editor         = document.getElementById('editor');
@@ -565,19 +566,33 @@ function dbEditorPanes() {
 async function openDatabaseView(folderId, folderName) {
   dbFolderId   = folderId;
   dbFolderName = folderName;
-  dbRows = []; dbCols = []; dbSortKey = 'title'; dbSortAsc = false;
+  dbSortKey = 'title'; dbSortAsc = false;
 
   dbEditorPanes().forEach(el => { if (el) el.style.display = 'none'; });
   const dbView = document.getElementById('db-view');
   dbView.style.display = 'flex';
   document.getElementById('db-folder-name').textContent = folderName;
+
+  if (dbRowCache[folderId]) {
+    dbRows = dbRowCache[folderId].rows;
+    dbCols = dbRowCache[folderId].cols;
+    renderDbTable();
+    return;
+  }
+
+  dbRows = []; dbCols = [];
   document.getElementById('db-tbody').innerHTML =
     '<tr><td colspan="99" class="db-loading">Loading…</td></tr>';
 
   try {
     const entry = await fetchFolderChildren(folderId);
     const files  = entry.files;
-    if (!files.length) { dbRows = []; dbCols = []; renderDbTable(); return; }
+    if (!files.length) {
+      dbRows = []; dbCols = [];
+      dbRowCache[folderId] = { rows: dbRows, cols: dbCols };
+      renderDbTable();
+      return;
+    }
 
     // Load all file contents in parallel, batched to avoid rate limits
     const batchSize = 8;
@@ -597,6 +612,7 @@ async function openDatabaseView(folderId, folderName) {
     }
     dbRows = rows;
     dbCols = inferDbCols(rows);
+    dbRowCache[folderId] = { rows: dbRows, cols: dbCols };
     renderDbTable();
   } catch (e) {
     document.getElementById('db-tbody').innerHTML =
@@ -631,6 +647,11 @@ function renderDbTable() {
     });
     hr.appendChild(th);
   });
+  const addTh = document.createElement('th');
+  addTh.className = 'db-add-col';
+  addTh.textContent = '+ Add property';
+  addTh.addEventListener('click', startAddDbColumn);
+  hr.appendChild(addTh);
   thead.appendChild(hr);
 
   // Sort rows
@@ -707,6 +728,32 @@ function renderDbTable() {
   });
 }
 
+function startAddDbColumn() {
+  const th = document.querySelector('#db-thead th.db-add-col');
+  if (!th || th.querySelector('input')) return;
+  const input = document.createElement('input');
+  input.type = 'text'; input.placeholder = 'Property name'; input.className = 'db-cell-input';
+  input.style.cssText = 'font-size:10px;width:120px;letter-spacing:.04em';
+  th.textContent = '';
+  th.appendChild(input);
+  input.focus();
+  let done = false;
+  const commit = () => {
+    if (done) return; done = true;
+    const key = input.value.trim().toLowerCase().replace(/\s+/g, '_');
+    if (key && !dbCols.includes(key)) {
+      dbCols.push(key);
+      if (dbRowCache[dbFolderId]) dbRowCache[dbFolderId].cols = dbCols;
+    }
+    renderDbTable();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { done = true; renderDbTable(); }
+  });
+}
+
 function startDbCellEdit(td, row, col, currentVal) {
   if (td.querySelector('input')) return;
   const input = document.createElement('input');
@@ -752,7 +799,11 @@ async function dbSaveCell(row, col, newVal) {
 
 async function dbAddNewRow() {
   if (!dbFolderId) return;
-  const filename = new Date().toISOString().slice(0,10) + '-untitled.md';
+  const base = new Date().toISOString().slice(0,10) + '-untitled';
+  const existing = new Set(dbRows.map(r => r.name));
+  let filename = base + '.md';
+  let n = 2;
+  while (existing.has(filename)) filename = `${base}-${n++}.md`;
   try {
     const boundary = '-------314159265358979323846';
     const metadata = JSON.stringify({ name: filename, mimeType: 'text/markdown', parents: [dbFolderId] });
@@ -774,6 +825,7 @@ async function dbAddNewRow() {
 
 document.getElementById('db-back-btn').addEventListener('click', closeDatabaseView);
 document.getElementById('db-new-row-btn').addEventListener('click', dbAddNewRow);
+document.getElementById('db-add-prop-btn').addEventListener('click', startAddDbColumn);
 
 // ── Recently opened files ─────────────────────────────────────────────────────
 function getRecents() {
@@ -1148,12 +1200,18 @@ document.addEventListener('fullscreenchange', () => {
 document.getElementById('focus-btn').addEventListener('click', toggleFocusMode);
 document.getElementById('focus-exit-btn').addEventListener('click', exitFocusMode);
 
+function toggleSidebar() {
+  document.getElementById('file-sidebar').classList.toggle('open');
+}
+document.getElementById('sidebar-toggle-btn').addEventListener('click', toggleSidebar);
+
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key === 's') { e.preventDefault(); performSave(false); }
   if (mod && e.key === 'n') { e.preventDefault(); if (!isDirty || confirm('Discard changes?')) openNewModal(); }
   if (mod && e.key === 'o') { e.preventDefault(); if (!driveConnected) document.getElementById('hdr-drive-connect').click(); }
+  if (mod && e.key === '\\') { e.preventDefault(); toggleSidebar(); }
   if (mod && e.shiftKey && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); toggleFocusMode(); return; }
   if (mod && e.key === 'f') { e.preventDefault(); openFindBar(); }
   if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoomLevel = Math.min(ZOOM_MAX, +(zoomLevel + ZOOM_STEP).toFixed(1)); applyZoom(); }
@@ -1425,7 +1483,7 @@ function updateSortBtn() {
 document.getElementById('sidebar-sort-btn').addEventListener('click', async () => {
   sortDesc = !sortDesc;
   updateSortBtn();
-  treeCache = {};
+  treeCache = {}; dbRowCache = {};
   await renderTree();
 });
 
@@ -1552,6 +1610,23 @@ async function moveDriveItem(itemId, oldParentId, newParentId) {
   }
 }
 
+async function duplicateDriveFile(node) {
+  const copyName = 'Copy of ' + node.name;
+  const parentId = (node.parents && node.parents[0]) || driveRootFolderId;
+  try {
+    await gapi.client.drive.files.copy({
+      fileId: node.id,
+      resource: { name: copyName, parents: [parentId] },
+    });
+    delete treeCache[parentId];
+    delete dbRowCache[parentId];
+    showToast('✓ Duplicated as “' + copyName + '”');
+    await renderTree();
+  } catch (e) {
+    showToast('Duplicate failed: ' + gErr(e), 4000);
+  }
+}
+
 // ── Row construction ──────────────────────────────────────────────────────────
 function buildRowActions(getNode, isFolder, getRow) {
   const wrap = document.createElement('span');
@@ -1562,6 +1637,12 @@ function buildRowActions(getNode, isFolder, getRow) {
     dbBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25ZM1.5 6v7.25c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V6Zm1-1.5h11V2.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm3.25 4a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5Z"/></svg>';
     dbBtn.addEventListener('click', (e) => { e.stopPropagation(); openDatabaseView(getNode().id, getNode().name); });
     wrap.appendChild(dbBtn);
+  } else {
+    const dupBtn = document.createElement('button');
+    dupBtn.type = 'button'; dupBtn.className = 'tree-action-btn'; dupBtn.title = 'Duplicate';
+    dupBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>';
+    dupBtn.addEventListener('click', (e) => { e.stopPropagation(); duplicateDriveFile(getNode()); });
+    wrap.appendChild(dupBtn);
   }
   const renameBtn = document.createElement('button');
   renameBtn.type = 'button'; renameBtn.className = 'tree-action-btn'; renameBtn.title = 'Rename';
@@ -1828,7 +1909,7 @@ async function createInlineNode(isFolder) {
 document.getElementById('sidebar-new-file-btn').addEventListener('click', () => createInlineNode(false));
 document.getElementById('sidebar-new-folder-btn').addEventListener('click', () => createInlineNode(true));
 document.getElementById('sidebar-refresh-btn').addEventListener('click', () => {
-  treeCache = {};
+  treeCache = {}; dbRowCache = {};
   renderTree();
 });
 

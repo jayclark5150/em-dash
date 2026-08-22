@@ -19,7 +19,9 @@ A Notion-style markdown editor that lives entirely in your browser and stores ev
 - **Sidebar sort order** — a toggle button in the sidebar header switches between Z→A and A→Z name order (Z→A by default, so ISO-date filenames show newest first). The sidebar also shows a count badge on each folder once expanded.
 - **Recently opened files** — a collapsible "Recent" section at the top of the sidebar lists the last 8 files you opened, persisted across sessions. Click the header to collapse or expand it.
 - **Open in Drive** — a small ↗ icon in the status bar links directly to the current file in drive.google.com.
-- **Database view** — hover any subfolder and click the table icon to open it as a spreadsheet. Each `.md` file becomes a row; YAML frontmatter keys become columns (auto-detected). Text cells are editable inline, booleans render as checkboxes, and arrays render as tags. Modified date and file size are always shown as system columns. Click a title to open the file; click any column header to sort.
+- **Database view** — hover any subfolder and click the table icon to open it as a spreadsheet. Each `.md` file becomes a row; YAML frontmatter keys become columns (auto-detected). Text cells are editable inline, booleans render as checkboxes, and arrays render as tags. Modified date and file size are always shown as system columns. Click a title to open the file; click any column header to sort. Use "+ Add property" to define new frontmatter columns without leaving the table.
+- **Sidebar toggle** — Cmd+\ (or the panel button at the top-left of the header) collapses/expands the file sidebar for a full-width editing view.
+- **Duplicate file** — hover any file in the sidebar to reveal a copy icon that creates "Copy of …" in the same folder.
 - Line numbers, word/character count, adjustable zoom, and light keyboard shortcuts.
 
 ## Tech
@@ -69,6 +71,14 @@ To use it:
 Remember to add your Pages URL to the API key's referrer restrictions and to your OAuth client's authorized JavaScript origins.
 
 ## Changelog
+
+### v3.6.0
+
+- **Sidebar toggle** — Cmd+\ (or the panel button in the header) hides/shows the sidebar, giving you a full-width editor when you need it.
+- **Duplicate file** — hover a file in the sidebar and click the copy icon to create "Copy of …" in the same folder.
+- **Add frontmatter property from database view** — click "+ Add property" in the database toolbar (or the ghost column header at the right end of the table) to define a new column by name; it appears immediately for all rows.
+- **Database view caching** — reopening a database folder you already visited no longer re-fetches all file contents; the row data is held in memory and reused until the sidebar is refreshed.
+- **New Row collision fix** — clicking "+ New Row" twice in the same day now produces `YYYY-MM-DD-untitled.md` and `YYYY-MM-DD-untitled-2.md` instead of two files with the same name.
 
 ### v3.5.0
 

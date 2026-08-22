@@ -552,6 +552,25 @@ body {
   font-family: var(--font);
 }
 #db-new-row-btn:hover { opacity: .85; }
+#db-add-prop-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: var(--font);
+}
+#db-add-prop-btn:hover { background: var(--bg3); color: var(--text); }
+#db-table th.db-add-col {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 12px;
+  opacity: .55;
+}
+#db-table th.db-add-col:hover { opacity: 1; color: var(--accent); }
 #db-table-wrap { flex: 1; overflow: auto; }
 #db-table {
   width: 100%;
