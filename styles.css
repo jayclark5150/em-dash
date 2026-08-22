@@ -504,6 +504,120 @@ body {
 .tree-action-btn:hover { color: var(--text); background: var(--border); }
 .tree-action-btn.tree-action-danger:hover { color: var(--red); background: rgba(224,108,117,.15); }
 
+/* ── Database view ───────────────────────────────────────────────────────────*/
+#db-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  min-width: 0;
+}
+#db-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg2);
+}
+#db-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  cursor: pointer;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: var(--font);
+}
+#db-back-btn:hover { background: var(--bg3); color: var(--text); }
+#db-folder-name { font-weight: 600; font-size: 14px; flex: 1; }
+#db-new-row-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: var(--font);
+}
+#db-new-row-btn:hover { opacity: .85; }
+#db-table-wrap { flex: 1; overflow: auto; }
+#db-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: auto;
+}
+#db-table th {
+  text-align: left;
+  padding: 8px 14px;
+  border-bottom: 2px solid var(--border);
+  color: var(--text2);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--bg2);
+  z-index: 1;
+}
+#db-table th:hover { color: var(--text); }
+#db-table th.sort-asc::after  { content: ' ↑'; opacity: .7; }
+#db-table th.sort-desc::after { content: ' ↓'; opacity: .7; }
+#db-table td {
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#db-table tbody tr:hover td { background: var(--bg2); }
+.db-title-cell { cursor: pointer; color: var(--accent); font-weight: 500; }
+.db-title-cell:hover { text-decoration: underline; }
+.db-bool-cell  { text-align: center; }
+.db-text-cell  { cursor: text; color: var(--text); }
+.db-text-cell:hover { background: var(--bg3) !important; }
+.db-tags-cell  { }
+.db-tag {
+  display: inline-block;
+  background: var(--bg3);
+  color: var(--text2);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin: 1px 2px;
+}
+.db-cell-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font);
+  padding: 2px 6px;
+  outline: none;
+  box-sizing: border-box;
+}
+.db-loading {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--text2);
+}
+
 /* Inline rename / create input rows */
 .tree-rename-input {
   flex: 1;

@@ -80,6 +80,14 @@ let childrenElMap    = {};            // folderId -> DOM container for its child
 let nodeDepthMap     = {};            // folderId -> nesting depth (root's children = 0)
 let folderCountElMap = {};            // folderId -> count badge span
 
+// ── Database view state ───────────────────────────────────────────────────────
+let dbFolderId   = null;
+let dbFolderName = '';
+let dbRows       = [];   // [{id, name, data, body}] — one per .md file
+let dbCols       = [];   // frontmatter keys inferred from all rows
+let dbSortKey    = 'title';
+let dbSortAsc    = true;
+
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const editor         = document.getElementById('editor');
 const previewInner   = document.getElementById('preview-inner');
@@ -492,6 +500,260 @@ document.getElementById('hdr-drive-signout').addEventListener('click', () => {
   showToast('Signed out of Google Drive');
 });
 
+// ── Frontmatter parser / serializer ──────────────────────────────────────────
+function parseFrontmatter(content) {
+  const m = content.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
+  if (!m) return { data: {}, body: content };
+  const body = content.slice(m[0].length);
+  const data = {};
+  m[1].split('\n').forEach(line => {
+    const kv = line.match(/^([\w][\w-]*)\s*:\s*(.*)/);
+    if (!kv) return;
+    const [, key, raw] = kv;
+    const val = raw.trim();
+    if      (val === 'true')                     data[key] = true;
+    else if (val === 'false')                    data[key] = false;
+    else if (val !== '' && !isNaN(val))          data[key] = Number(val);
+    else if (val.startsWith('[') && val.endsWith(']'))
+      data[key] = val.slice(1,-1).split(',').map(s => s.trim()).filter(Boolean);
+    else data[key] = val.replace(/^["']|["']$/g, '');
+  });
+  return { data, body };
+}
+
+function serializeFrontmatter(data, body) {
+  const keys = Object.keys(data);
+  if (!keys.length) return body;
+  const lines = keys.map(k => {
+    const v = data[k];
+    if (Array.isArray(v))  return `${k}: [${v.join(', ')}]`;
+    if (typeof v === 'string' && /[:#\[\]{}]/.test(v)) return `${k}: "${v.replace(/"/g, '\\"')}"`;
+    return `${k}: ${v}`;
+  });
+  return `---\n${lines.join('\n')}\n---\n${body}`;
+}
+
+function inferDbCols(rows) {
+  const freq = {};
+  rows.forEach(r => Object.keys(r.data).forEach(k => {
+    if (k !== 'title') freq[k] = (freq[k] || 0) + 1;
+  }));
+  return Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
+}
+
+// ── Database view ─────────────────────────────────────────────────────────────
+function dbEditorPanes() {
+  return [
+    document.getElementById('editor-pane'),
+    document.getElementById('divider'),
+    document.getElementById('preview-wrapper'),
+  ];
+}
+
+async function openDatabaseView(folderId, folderName) {
+  dbFolderId   = folderId;
+  dbFolderName = folderName;
+  dbRows = []; dbCols = []; dbSortKey = 'title'; dbSortAsc = true;
+
+  dbEditorPanes().forEach(el => { if (el) el.style.display = 'none'; });
+  const dbView = document.getElementById('db-view');
+  dbView.style.display = 'flex';
+  document.getElementById('db-folder-name').textContent = folderName;
+  document.getElementById('db-tbody').innerHTML =
+    '<tr><td colspan="99" class="db-loading">Loading…</td></tr>';
+
+  try {
+    const entry = await fetchFolderChildren(folderId);
+    const files  = entry.files;
+    if (!files.length) { dbRows = []; dbCols = []; renderDbTable(); return; }
+
+    // Load all file contents in parallel, batched to avoid rate limits
+    const batchSize = 8;
+    const rows = [];
+    for (let i = 0; i < files.length; i += batchSize) {
+      const batch = files.slice(i, i + batchSize);
+      const results = await Promise.all(batch.map(async f => {
+        try {
+          const res = await gapi.client.drive.files.get({ fileId: f.id, alt: 'media' });
+          const { data, body } = parseFrontmatter(res.body);
+          return { id: f.id, name: f.name, data, body };
+        } catch (_) {
+          return { id: f.id, name: f.name, data: {}, body: '' };
+        }
+      }));
+      rows.push(...results);
+    }
+    dbRows = rows;
+    dbCols = inferDbCols(rows);
+    renderDbTable();
+  } catch (e) {
+    document.getElementById('db-tbody').innerHTML =
+      `<tr><td colspan="99" class="db-loading">Failed to load: ${gErr(e)}</td></tr>`;
+  }
+}
+
+function closeDatabaseView() {
+  dbFolderId = null;
+  document.getElementById('db-view').style.display = 'none';
+  dbEditorPanes().forEach(el => { if (el) el.style.display = ''; });
+}
+
+function renderDbTable() {
+  const thead = document.getElementById('db-thead');
+  const tbody = document.getElementById('db-tbody');
+  const cols  = ['title', ...dbCols];
+
+  // Header row
+  thead.innerHTML = '';
+  const hr = document.createElement('tr');
+  cols.forEach(col => {
+    const th = document.createElement('th');
+    th.textContent = col === 'title' ? 'Title' : col;
+    th.dataset.col = col;
+    if (dbSortKey === col) th.classList.add(dbSortAsc ? 'sort-asc' : 'sort-desc');
+    th.addEventListener('click', () => {
+      if (dbSortKey === col) dbSortAsc = !dbSortAsc;
+      else { dbSortKey = col; dbSortAsc = true; }
+      renderDbTable();
+    });
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+
+  // Sort rows
+  const sorted = [...dbRows].sort((a, b) => {
+    const av = dbSortKey === 'title'
+      ? (a.data.title || a.name)
+      : (a.data[dbSortKey] ?? '');
+    const bv = dbSortKey === 'title'
+      ? (b.data.title || b.name)
+      : (b.data[dbSortKey] ?? '');
+    const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+    return dbSortAsc ? cmp : -cmp;
+  });
+
+  // Data rows
+  tbody.innerHTML = '';
+  if (!sorted.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = cols.length;
+    td.className = 'db-loading';
+    td.textContent = 'No markdown files in this folder yet.';
+    tr.appendChild(td); tbody.appendChild(tr);
+    return;
+  }
+
+  sorted.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.dataset.id = row.id;
+    cols.forEach(col => {
+      const td = document.createElement('td');
+      if (col === 'title') {
+        const display = row.data.title || row.name.replace(/\.(md|markdown|txt)$/i, '');
+        td.className = 'db-title-cell';
+        td.textContent = display;
+        td.title = row.name;
+        td.addEventListener('click', () => {
+          const fid = dbFolderId;
+          closeDatabaseView();
+          loadDriveFile(row.id, row.name, fid || driveRootFolderId);
+        });
+      } else {
+        const val = row.data[col];
+        if (typeof val === 'boolean') {
+          td.className = 'db-bool-cell';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox'; cb.checked = val;
+          cb.addEventListener('change', () => dbSaveCell(row, col, cb.checked));
+          td.appendChild(cb);
+        } else if (Array.isArray(val)) {
+          td.className = 'db-tags-cell';
+          (val || []).forEach(tag => {
+            const chip = document.createElement('span');
+            chip.className = 'db-tag'; chip.textContent = tag;
+            td.appendChild(chip);
+          });
+        } else {
+          td.className = 'db-text-cell';
+          td.textContent = val ?? '';
+          td.addEventListener('click', () => startDbCellEdit(td, row, col, val ?? ''));
+        }
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+function startDbCellEdit(td, row, col, currentVal) {
+  if (td.querySelector('input')) return;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = String(currentVal);
+  input.className = 'db-cell-input';
+  td.textContent = '';
+  td.appendChild(input);
+  input.focus(); input.select();
+  let committed = false;
+  const commit = async () => {
+    if (committed) return; committed = true;
+    const newVal = input.value.trim();
+    if (newVal !== String(currentVal)) await dbSaveCell(row, col, newVal || undefined);
+    else renderDbTable();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { committed = true; renderDbTable(); }
+  });
+}
+
+async function dbSaveCell(row, col, newVal) {
+  if (newVal === undefined) delete row.data[col];
+  else row.data[col] = newVal;
+  const newContent = serializeFrontmatter(row.data, row.body);
+  try {
+    const boundary = '-------314159265358979323846';
+    const metadata = JSON.stringify({ name: row.name });
+    const reqBody  = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: text/markdown\r\n\r\n${newContent}\r\n--${boundary}--`;
+    await gapi.client.request({
+      path: `/upload/drive/v3/files/${row.id}`, method: 'PATCH',
+      params: { uploadType: 'multipart' },
+      headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
+      body: reqBody,
+    });
+  } catch (e) {
+    showToast('Save failed: ' + gErr(e), 4000);
+  }
+  renderDbTable();
+}
+
+async function dbAddNewRow() {
+  if (!dbFolderId) return;
+  const filename = new Date().toISOString().slice(0,10) + '-untitled.md';
+  try {
+    const boundary = '-------314159265358979323846';
+    const metadata = JSON.stringify({ name: filename, mimeType: 'text/markdown', parents: [dbFolderId] });
+    const reqBody  = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: text/markdown\r\n\r\n\r\n--${boundary}--`;
+    const res = await gapi.client.request({
+      path: '/upload/drive/v3/files', method: 'POST',
+      params: { uploadType: 'multipart' },
+      headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
+      body: reqBody,
+    });
+    dbRows.push({ id: res.result.id, name: filename, data: {}, body: '' });
+    delete treeCache[dbFolderId];
+    renderDbTable();
+    showToast('✓ New row created — click the title to open it');
+  } catch (e) {
+    showToast('Could not create row: ' + gErr(e), 4000);
+  }
+}
+
+document.getElementById('db-back-btn').addEventListener('click', closeDatabaseView);
+document.getElementById('db-new-row-btn').addEventListener('click', dbAddNewRow);
+
 // ── Recently opened files ─────────────────────────────────────────────────────
 function getRecents() {
   try { return JSON.parse(localStorage.getItem(RECENTS_KEY)) || []; } catch (_) { return []; }
@@ -868,6 +1130,7 @@ document.addEventListener('keydown', (e) => {
   if (mod && e.key === '-') { e.preventDefault(); zoomLevel = Math.max(ZOOM_MIN, +(zoomLevel - ZOOM_STEP).toFixed(1)); applyZoom(); }
   if (mod && e.key === '0') { e.preventDefault(); zoomLevel = 1.0; applyZoom(); }
   if (e.key === 'Escape' && findBar.classList.contains('visible')) closeFindBar();
+  if (e.key === 'Escape' && dbFolderId) closeDatabaseView();
   if (e.key === 'F11') { e.preventDefault(); toggleFocusMode(); }
   if (e.key === 'Escape' && focusMode) exitFocusMode();
 });
@@ -1263,6 +1526,13 @@ async function moveDriveItem(itemId, oldParentId, newParentId) {
 function buildRowActions(getNode, isFolder, getRow) {
   const wrap = document.createElement('span');
   wrap.className = 'tree-row-actions';
+  if (isFolder) {
+    const dbBtn = document.createElement('button');
+    dbBtn.type = 'button'; dbBtn.className = 'tree-action-btn'; dbBtn.title = 'Open as database';
+    dbBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25ZM1.5 6v7.25c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V6Zm1-1.5h11V2.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm3.25 4a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5Z"/></svg>';
+    dbBtn.addEventListener('click', (e) => { e.stopPropagation(); openDatabaseView(getNode().id, getNode().name); });
+    wrap.appendChild(dbBtn);
+  }
   const renameBtn = document.createElement('button');
   renameBtn.type = 'button'; renameBtn.className = 'tree-action-btn'; renameBtn.title = 'Rename';
   renameBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19H4v-3L16.5 3.5z"/></svg>';
