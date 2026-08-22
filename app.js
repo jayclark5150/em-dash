@@ -86,7 +86,7 @@ let dbFolderName = '';
 let dbRows       = [];   // [{id, name, data, body}] — one per .md file
 let dbCols       = [];   // frontmatter keys inferred from all rows
 let dbSortKey    = 'title';
-let dbSortAsc    = true;
+let dbSortAsc    = false;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const editor         = document.getElementById('editor');
@@ -565,7 +565,7 @@ function dbEditorPanes() {
 async function openDatabaseView(folderId, folderName) {
   dbFolderId   = folderId;
   dbFolderName = folderName;
-  dbRows = []; dbCols = []; dbSortKey = 'title'; dbSortAsc = true;
+  dbRows = []; dbCols = []; dbSortKey = 'title'; dbSortAsc = false;
 
   dbEditorPanes().forEach(el => { if (el) el.style.display = 'none'; });
   const dbView = document.getElementById('db-view');
@@ -626,7 +626,7 @@ function renderDbTable() {
     if (dbSortKey === col) th.classList.add(dbSortAsc ? 'sort-asc' : 'sort-desc');
     th.addEventListener('click', () => {
       if (dbSortKey === col) dbSortAsc = !dbSortAsc;
-      else { dbSortKey = col; dbSortAsc = true; }
+      else { dbSortKey = col; dbSortAsc = false; }
       renderDbTable();
     });
     hr.appendChild(th);
@@ -1405,7 +1405,7 @@ function isMarkdownLikeFile(f) {
          /\.(md|markdown|txt)$/i.test(f.name || '');
 }
 
-let sortDesc = false;
+let sortDesc = true;
 
 function updateSortBtn() {
   const btn = document.getElementById('sidebar-sort-btn');
