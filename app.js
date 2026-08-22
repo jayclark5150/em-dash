@@ -636,7 +636,6 @@ function runFind() {
 function highlightMatch() {
   if (!findMatches.length) return;
   const pos = findMatches[findIndex];
-  editor.focus();
   editor.setSelectionRange(pos, pos + findInput.value.length);
   matchInfo.textContent = `${findIndex + 1} / ${findMatches.length}`;
   const linesBefore = editor.value.slice(0, pos).split('\n').length;
@@ -649,7 +648,6 @@ function findPrev() { if (!findMatches.length) { runFind(); return; } findIndex 
 function doReplace() {
   if (!findMatches.length) { runFind(); return; }
   const pos = findMatches[findIndex];
-  editor.focus();
   editor.setSelectionRange(pos, pos + findInput.value.length);
   document.execCommand('insertText', false, replaceInput.value);
   isDirty = true; renderPreview(); updateStats();
