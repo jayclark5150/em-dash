@@ -21,14 +21,14 @@
 // 3. The config.js file is in .gitignore and will never be committed
 //
 // ─────────────────────────────────────────────────────────────────────────────
-// FOR PRODUCTION DEPLOYMENT (GitHub Pages)
+// FOR PRODUCTION DEPLOYMENT (Vercel)
 // ─────────────────────────────────────────────────────────────────────────────
 //
-// Credentials are automatically injected at build time by GitHub Actions from
-// the encrypted repository secrets. The deployed application will have real
-// credentials in window.APP_CONFIG, but they are never visible in:
+// Credentials are automatically injected at build time by build-config.js,
+// which reads them from Vercel Environment Variables. The deployed application
+// will have real credentials in window.APP_CONFIG, but they are never visible in:
 // - Git history
-// - Build logs (secrets are masked)
+// - Build logs (env vars are masked)
 // - Source code repository
 //
 // ═══════════════════════════════════════════════════════════════════════════════

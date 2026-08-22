@@ -38,7 +38,7 @@ function validateCredentials() {
         'For local development:\n' +
         '1. Copy config.example.js to config.js\n' +
         '2. Replace PLACEHOLDER values with actual credentials from Google Cloud Console\n' +
-        '3. See the Setup section in README.md\n\n' +
+        '3. See CREDENTIAL_ROTATION_GUIDE.md for setup and rotation instructions\n\n' +
         'For production: Credentials are injected at deploy time from Vercel Environment Variables.'
       );
     } else {
