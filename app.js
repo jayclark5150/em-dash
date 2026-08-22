@@ -533,6 +533,18 @@ function serializeFrontmatter(data, body) {
   return `---\n${lines.join('\n')}\n---\n${body}`;
 }
 
+function formatDbDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+function formatDbSize(bytes) {
+  if (bytes == null || bytes === '') return '';
+  const n = Number(bytes);
+  if (n < 1024)    return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(1) + ' MB';
+}
+
 function inferDbCols(rows) {
   const freq = {};
   rows.forEach(r => Object.keys(r.data).forEach(k => {
@@ -576,9 +588,9 @@ async function openDatabaseView(folderId, folderName) {
         try {
           const res = await gapi.client.drive.files.get({ fileId: f.id, alt: 'media' });
           const { data, body } = parseFrontmatter(res.body);
-          return { id: f.id, name: f.name, data, body };
+          return { id: f.id, name: f.name, data, body, modifiedTime: f.modifiedTime, size: f.size };
         } catch (_) {
-          return { id: f.id, name: f.name, data: {}, body: '' };
+          return { id: f.id, name: f.name, data: {}, body: '', modifiedTime: f.modifiedTime, size: f.size };
         }
       }));
       rows.push(...results);
@@ -601,14 +613,15 @@ function closeDatabaseView() {
 function renderDbTable() {
   const thead = document.getElementById('db-thead');
   const tbody = document.getElementById('db-tbody');
-  const cols  = ['title', ...dbCols];
+  const cols  = ['title', ...dbCols, 'modified', 'size'];
+  const colLabel = { title: 'Title', modified: 'Modified', size: 'Size' };
 
   // Header row
   thead.innerHTML = '';
   const hr = document.createElement('tr');
   cols.forEach(col => {
     const th = document.createElement('th');
-    th.textContent = col === 'title' ? 'Title' : col;
+    th.textContent = colLabel[col] || col;
     th.dataset.col = col;
     if (dbSortKey === col) th.classList.add(dbSortAsc ? 'sort-asc' : 'sort-desc');
     th.addEventListener('click', () => {
@@ -622,13 +635,14 @@ function renderDbTable() {
 
   // Sort rows
   const sorted = [...dbRows].sort((a, b) => {
-    const av = dbSortKey === 'title'
-      ? (a.data.title || a.name)
-      : (a.data[dbSortKey] ?? '');
-    const bv = dbSortKey === 'title'
-      ? (b.data.title || b.name)
-      : (b.data[dbSortKey] ?? '');
-    const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+    let av, bv;
+    if      (dbSortKey === 'title')    { av = a.data.title || a.name; bv = b.data.title || b.name; }
+    else if (dbSortKey === 'modified') { av = a.modifiedTime || ''; bv = b.modifiedTime || ''; }
+    else if (dbSortKey === 'size')     { av = Number(a.size || 0);   bv = Number(b.size || 0); }
+    else                               { av = a.data[dbSortKey] ?? ''; bv = b.data[dbSortKey] ?? ''; }
+    const cmp = (typeof av === 'number' && typeof bv === 'number')
+      ? av - bv
+      : String(av).localeCompare(String(bv), undefined, { numeric: true });
     return dbSortAsc ? cmp : -cmp;
   });
 
@@ -659,6 +673,13 @@ function renderDbTable() {
           closeDatabaseView();
           loadDriveFile(row.id, row.name, fid || driveRootFolderId);
         });
+      } else if (col === 'modified') {
+        td.className = 'db-meta-cell';
+        td.textContent = formatDbDate(row.modifiedTime);
+        td.title = row.modifiedTime || '';
+      } else if (col === 'size') {
+        td.className = 'db-meta-cell db-size-cell';
+        td.textContent = formatDbSize(row.size);
       } else {
         const val = row.data[col];
         if (typeof val === 'boolean') {
@@ -1406,7 +1427,7 @@ async function fetchFolderChildren(folderId) {
   let pageToken;
   do {
     const res = await gapi.client.drive.files.list({
-      q, fields: 'nextPageToken, files(id,name,mimeType,parents)', orderBy,
+      q, fields: 'nextPageToken, files(id,name,mimeType,parents,modifiedTime,size)', orderBy,
       pageSize: 1000, pageToken
     });
     items.push(...(res.result.files || []));
