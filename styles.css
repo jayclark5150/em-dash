@@ -454,6 +454,7 @@ body {
   text-align: center;
 }
 .tree-icon { font-size: 12px; color: var(--text2); flex-shrink: 0; }
+.tree-thumb { width: 20px; height: 20px; object-fit: cover; border-radius: 3px; display: block; }
 .tree-name { overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .tree-count { font-size: 10px; color: var(--text2); opacity: .6; flex-shrink: 0; margin-left: 4px; }
 .tree-children { display: flex; flex-direction: column; }

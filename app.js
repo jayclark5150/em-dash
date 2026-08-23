@@ -26,6 +26,9 @@ const FOLDER_MIME       = 'application/vnd.google-apps.folder';
 const ROOT_FOLDER_ID_KEY = 'emdash-root-folder-id';
 const RECENTS_KEY        = 'emdash-recents';
 const RECENTS_MAX        = 8;
+const DRIVE_AUTH_KEY     = 'emdash-drive-connected';
+const THUMB_CACHE_KEY    = 'emdash-thumb-cache';
+const THUMB_CACHE_TTL    = 60 * 60 * 1000; // 1 hour
 
 // Validate credentials are present
 function validateCredentials() {
@@ -395,6 +398,61 @@ function gErr(e) {
          (typeof e === 'string' ? e : JSON.stringify(e));
 }
 
+// ── Thumbnail cache (localStorage, 1-hour TTL) ────────────────────────────────
+function getThumbCache() {
+  try { return JSON.parse(localStorage.getItem(THUMB_CACHE_KEY)) || {}; } catch (_) { return {}; }
+}
+function setThumbCache(cache) {
+  try { localStorage.setItem(THUMB_CACHE_KEY, JSON.stringify(cache)); } catch (_) {}
+}
+function getCachedThumb(fileId) {
+  const cache = getThumbCache();
+  const entry = cache[fileId];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > THUMB_CACHE_TTL) { delete cache[fileId]; setThumbCache(cache); return null; }
+  return entry.url;
+}
+function updateThumbCache(files) {
+  if (!files || !files.length) return;
+  const cache = getThumbCache();
+  let changed = false;
+  files.forEach(f => {
+    if (f.thumbnailLink) { cache[f.id] = { url: f.thumbnailLink, ts: Date.now() }; changed = true; }
+  });
+  if (changed) setThumbCache(cache);
+}
+
+// ── Silent re-auth on page load ───────────────────────────────────────────────
+// If the user previously connected, attempt a silent token refresh so they
+// don't have to click "Connect" again after a page reload.
+function trySilentAuth() {
+  let wasConnected = false;
+  try { wasConnected = localStorage.getItem(DRIVE_AUTH_KEY) === '1'; } catch (_) {}
+  if (!wasConnected) return;
+  if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.includes('PLACEHOLDER') || GOOGLE_CLIENT_ID.includes('YOUR_')) return;
+  if (!window.google || !google.accounts || !google.accounts.oauth2) return;
+
+  const silentClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SCOPES,
+    prompt: '',
+    callback: async (response) => {
+      if (response.error) {
+        try { localStorage.removeItem(DRIVE_AUTH_KEY); } catch (_) {}
+        return;
+      }
+      try {
+        await initGoogleApi();
+        gapi.client.setToken({ access_token: response.access_token });
+        onDriveConnected();
+      } catch (e) {
+        console.error('Silent Drive init failed:', e);
+      }
+    },
+  });
+  silentClient.requestAccessToken({ prompt: '' });
+}
+
 // Create the GSI token client once. This is synchronous config only — safe to
 // call inside a click handler so the OAuth popup opens within the user gesture.
 function ensureTokenClient() {
@@ -446,6 +504,7 @@ async function ensureRootFolder() {
 
 async function onDriveConnected() {
   driveConnected = true;
+  try { localStorage.setItem(DRIVE_AUTH_KEY, '1'); } catch (_) {}
   setDriveStatus('connected', 'Drive connected');
   // Header dropdown: hide "Connect", reveal "Sign out" + "Sync"
   document.getElementById('hdr-drive-connect').style.display  = 'none';
@@ -481,6 +540,7 @@ document.getElementById('hdr-drive-signout').addEventListener('click', () => {
   const token = gapi.client.getToken();
   if (token) google.accounts.oauth2.revoke(token.access_token);
   gapi.client.setToken('');
+  try { localStorage.removeItem(DRIVE_AUTH_KEY); } catch (_) {}
   driveConnected    = false;
   driveFileId       = null;
   driveFileName     = null;
@@ -587,7 +647,7 @@ async function openDatabaseView(folderId, folderName) {
 
   try {
     const entry = await fetchFolderChildren(folderId);
-    const files  = entry.files;
+    const files  = entry.files.filter(isMarkdownLikeFile);
     if (!files.length) {
       dbRows = []; dbCols = [];
       dbRowCache[folderId] = { rows: dbRows, cols: dbCols };
@@ -933,8 +993,22 @@ function updateDriveLink(fileId) {
 async function loadDriveFile(fileId, fileName, parentId) {
   try {
     setDriveStatus('saving', 'Loading…');
-    const res = await gapi.client.drive.files.get({ fileId, alt: 'media' });
-    editor.value       = res.body;
+    const meta = await gapi.client.drive.files.get({ fileId, fields: 'id,mimeType' });
+    const mimeType = meta.result.mimeType;
+    if (!canOpenAsText(mimeType)) {
+      setDriveStatus('connected', 'Drive connected');
+      showToast('This file type cannot be opened as text (' + mimeType + ')', 4000);
+      return;
+    }
+    let content;
+    if (isGoogleDocsFile(mimeType)) {
+      const res = await gapi.client.request({ path: `/drive/v3/files/${fileId}/export`, params: { mimeType: 'text/plain' } });
+      content = res.body;
+    } else {
+      const res = await gapi.client.drive.files.get({ fileId, alt: 'media' });
+      content = res.body;
+    }
+    editor.value       = content;
     driveFileId        = fileId;
     driveFileName      = fileName;
     driveFileParentId  = parentId || driveFileParentId || driveRootFolderId;
@@ -1516,6 +1590,24 @@ function isMarkdownLikeFile(f) {
          /\.(md|markdown|txt)$/i.test(f.name || '');
 }
 
+function fileIcon(mimeType) {
+  if (!mimeType) return '📄';
+  if (mimeType === 'application/vnd.google-apps.document') return '📝';
+  if (mimeType.startsWith('application/vnd.google-apps.')) return '📊';
+  if (mimeType.startsWith('image/')) return '🖼';
+  if (mimeType === 'application/pdf') return '📋';
+  return '📄';
+}
+
+function isGoogleDocsFile(mimeType) {
+  return mimeType === 'application/vnd.google-apps.document';
+}
+
+function canOpenAsText(mimeType) {
+  return isMarkdownLikeFile({ mimeType }) || isGoogleDocsFile(mimeType) ||
+         mimeType === 'application/octet-stream';
+}
+
 let sortDesc = true;
 
 function updateSortBtn() {
@@ -1538,14 +1630,15 @@ async function fetchFolderChildren(folderId) {
   let pageToken;
   do {
     const res = await gapi.client.drive.files.list({
-      q, fields: 'nextPageToken, files(id,name,mimeType,parents,modifiedTime,size)', orderBy,
+      q, fields: 'nextPageToken, files(id,name,mimeType,parents,modifiedTime,size,thumbnailLink)', orderBy,
       pageSize: 1000, pageToken
     });
     items.push(...(res.result.files || []));
     pageToken = res.result.nextPageToken;
   } while (pageToken);
   const folders = items.filter(f => f.mimeType === FOLDER_MIME);
-  const files   = items.filter(f => f.mimeType !== FOLDER_MIME && isMarkdownLikeFile(f));
+  const files   = items.filter(f => f.mimeType !== FOLDER_MIME);
+  updateThumbCache(files);
   const entry = { folders, files };
   treeCache[folderId] = entry;
   return entry;
@@ -1769,7 +1862,17 @@ function buildFileRow(node, depth) {
 
   const icon = document.createElement('span');
   icon.className = 'tree-icon';
-  icon.textContent = '📄';
+  const cachedThumb = getCachedThumb(node.id);
+  if (cachedThumb) {
+    const img = document.createElement('img');
+    img.src = cachedThumb;
+    img.className = 'tree-thumb';
+    img.alt = '';
+    img.addEventListener('error', () => { img.remove(); icon.textContent = fileIcon(node.mimeType); });
+    icon.appendChild(img);
+  } else {
+    icon.textContent = fileIcon(node.mimeType);
+  }
   const nameEl = document.createElement('span');
   nameEl.className = 'tree-name';
   nameEl.textContent = node.name;
@@ -2133,3 +2236,4 @@ updateStats();
 updateCursor();
 updateLineNumbers();
 applyZoom();
+trySilentAuth();
