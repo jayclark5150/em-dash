@@ -84,6 +84,8 @@ let dbCols       = [];   // frontmatter keys inferred from all rows
 let dbSortKey    = 'title';
 let dbSortAsc    = false;
 let dbRowCache   = {};   // folderId -> {rows, cols}; cleared alongside treeCache
+let boardFolderId   = null;
+let boardFolderName = '';
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const editor         = document.getElementById('editor');
@@ -654,6 +656,142 @@ function closeDatabaseView() {
   dbEditorPanes().forEach(el => { if (el) el.style.display = ''; });
 }
 
+// ── Board view ────────────────────────────────────────────────────────────────
+function boardEditorPanes() {
+  return [
+    document.getElementById('editor-pane'),
+    document.getElementById('divider'),
+    document.getElementById('preview-wrapper'),
+  ];
+}
+
+async function openBoardView(folderId, folderName) {
+  boardFolderId   = folderId;
+  boardFolderName = folderName;
+  closeDatabaseView();
+  boardEditorPanes().forEach(el => { if (el) el.style.display = 'none'; });
+  document.getElementById('board-view').style.display = 'flex';
+  document.getElementById('board-folder-name').textContent = folderName;
+  await renderBoard();
+}
+
+function closeBoardView() {
+  boardFolderId = null;
+  document.getElementById('board-view').style.display = 'none';
+  boardEditorPanes().forEach(el => { if (el) el.style.display = ''; });
+}
+
+async function renderBoard() {
+  const colsEl = document.getElementById('board-columns');
+  colsEl.innerHTML = '<div class="db-loading">Loading…</div>';
+  try {
+    const entry = await fetchFolderChildren(boardFolderId);
+    if (!entry.folders.length) {
+      colsEl.innerHTML = '<div class="db-loading">No columns — add subfolders to create board columns.</div>';
+      return;
+    }
+    colsEl.innerHTML = '';
+    let dragSrcFileId = null;
+    let dragSrcColId  = null;
+
+    for (const col of entry.folders) {
+      const colEntry = await fetchFolderChildren(col.id);
+      const files = colEntry.files.filter(f => canOpenAsText(f.mimeType));
+
+      const colEl   = document.createElement('div');
+      colEl.className = 'board-col';
+
+      const header  = document.createElement('div');
+      header.className = 'board-col-header';
+      const nameSpan  = document.createElement('span');
+      nameSpan.textContent = col.name;
+      const countBadge = document.createElement('span');
+      countBadge.className = 'board-col-count';
+      countBadge.textContent = files.length;
+      header.append(nameSpan, countBadge);
+
+      const cardsEl = document.createElement('div');
+      cardsEl.className = 'board-col-cards';
+
+      for (const f of files) {
+        const card = document.createElement('div');
+        card.className = 'board-card';
+        card.draggable = true;
+        card.textContent = f.name.replace(/\.md$/i, '');
+        card.title = 'Click to open · drag to move';
+
+        card.addEventListener('click', () => {
+          closeBoardView();
+          loadDriveFile(f.id, f.name, col.id);
+        });
+        card.addEventListener('dragstart', (e) => {
+          dragSrcFileId = f.id;
+          dragSrcColId  = col.id;
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        card.addEventListener('dragend', () => card.classList.remove('dragging'));
+        cardsEl.appendChild(card);
+      }
+
+      colEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        colEl.classList.add('drag-over');
+      });
+      colEl.addEventListener('dragleave', (e) => {
+        if (!colEl.contains(e.relatedTarget)) colEl.classList.remove('drag-over');
+      });
+      colEl.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        colEl.classList.remove('drag-over');
+        if (!dragSrcFileId || dragSrcColId === col.id) return;
+        try {
+          await gapi.client.drive.files.update({
+            fileId: dragSrcFileId,
+            addParents: col.id,
+            removeParents: dragSrcColId,
+            fields: 'id,parents',
+          });
+          delete treeCache[dragSrcColId];
+          delete treeCache[col.id];
+          showToast('✓ Moved');
+          await renderBoard();
+        } catch (err) {
+          showToast('Move failed: ' + gErr(err), 4000);
+        }
+      });
+
+      const addEl  = document.createElement('div');
+      addEl.className = 'board-col-add';
+      const addBtn = document.createElement('button');
+      addBtn.textContent = '+ Add task';
+      addBtn.addEventListener('click', async () => {
+        const raw = prompt('Task name:');
+        if (!raw || !raw.trim()) return;
+        const fileName = raw.trim().replace(/\.md$/i, '') + '.md';
+        try {
+          await gapi.client.drive.files.create({
+            resource: { name: fileName, mimeType: 'text/markdown', parents: [col.id] },
+            fields: 'id',
+          });
+          delete treeCache[col.id];
+          showToast('✓ Task created');
+          await renderBoard();
+        } catch (err) {
+          showToast('Create failed: ' + gErr(err), 4000);
+        }
+      });
+      addEl.appendChild(addBtn);
+
+      colEl.append(header, cardsEl, addEl);
+      colsEl.appendChild(colEl);
+    }
+  } catch (e) {
+    colsEl.innerHTML = `<div class="db-loading">Failed to load: ${gErr(e)}</div>`;
+  }
+}
+
 function renderDbTable() {
   const thead = document.getElementById('db-thead');
   const tbody = document.getElementById('db-tbody');
@@ -895,6 +1033,7 @@ async function dbAddNewRow() {
 }
 
 document.getElementById('db-back-btn').addEventListener('click', closeDatabaseView);
+document.getElementById('board-back-btn').addEventListener('click', closeBoardView);
 document.getElementById('db-new-row-btn').addEventListener('click', dbAddNewRow);
 document.getElementById('db-add-prop-btn').addEventListener('click', startAddDbColumn);
 
@@ -958,6 +1097,8 @@ function updateDriveLink(fileId) {
 }
 
 async function loadDriveFile(fileId, fileName, parentId) {
+  closeDatabaseView();
+  closeBoardView();
   try {
     setDriveStatus('saving', 'Loading…');
     const meta = await gapi.client.drive.files.get({ fileId, fields: 'id,mimeType' });
@@ -1304,6 +1445,7 @@ document.addEventListener('keydown', (e) => {
   if (mod && e.key === '0') { e.preventDefault(); zoomLevel = 1.0; applyZoom(); }
   if (e.key === 'Escape' && findBar.classList.contains('visible')) closeFindBar();
   if (e.key === 'Escape' && dbFolderId) closeDatabaseView();
+  if (e.key === 'Escape' && boardFolderId) closeBoardView();
   if (e.key === 'F11') { e.preventDefault(); toggleFocusMode(); }
   if (e.key === 'Escape' && focusMode) exitFocusMode();
 });
@@ -1778,7 +1920,11 @@ function buildRowActions(getNode, isFolder, getRow) {
     dbBtn.type = 'button'; dbBtn.className = 'tree-action-btn'; dbBtn.title = 'Open as database';
     dbBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25ZM1.5 6v7.25c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V6Zm1-1.5h11V2.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25Zm3.25 4a.75.75 0 0 0 0 1.5h5a.75.75 0 0 0 0-1.5Z"/></svg>';
     dbBtn.addEventListener('click', (e) => { e.stopPropagation(); openDatabaseView(getNode().id, getNode().name); });
-    wrap.appendChild(dbBtn);
+    const boardBtn = document.createElement('button');
+    boardBtn.type = 'button'; boardBtn.className = 'tree-action-btn'; boardBtn.title = 'Open as board';
+    boardBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M1.75 0h3.5C6.216 0 7 .784 7 1.75v12.5A1.75 1.75 0 0 1 5.25 16h-3.5A1.75 1.75 0 0 1 0 14.25V1.75C0 .784.784 0 1.75 0Zm0 1.5a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h3.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25Zm8.75-1.5h3.75c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0 1 14.25 9H10.5A1.75 1.75 0 0 1 8.75 7.25v-7.5C8.75.784 9.534 0 10.5 0Zm-.25 1.75v7.5c0 .138.112.25.25.25h3.75a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25H10.5a.25.25 0 0 0-.25.25Z"/></svg>';
+    boardBtn.addEventListener('click', (e) => { e.stopPropagation(); openBoardView(getNode().id, getNode().name); });
+    wrap.append(dbBtn, boardBtn);
   } else {
     const dupBtn = document.createElement('button');
     dupBtn.type = 'button'; dupBtn.className = 'tree-action-btn'; dupBtn.title = 'Duplicate';

@@ -76,6 +76,10 @@ Remember to add your Vercel deployment URL to the API key's HTTP referrer restri
 
 ## Changelog
 
+### v3.10.0
+
+- **Board view** — hover any folder in the sidebar and click the new columns icon to open it as a Kanban board. Each subfolder becomes a column; each file becomes a draggable card. Drag a card between columns to move the file in Drive. Click any card to open the file in the editor. "+ Add task" creates a new `.md` file directly in that column's Drive folder. Escape or the Back button returns to the editor.
+
 ### v3.9.0
 
 - **My Drive root** — Em Dash now shows your full Drive tree starting at My Drive root instead of keeping files inside a dedicated "Em Dash" subfolder. The sidebar header reads "My Drive" and all files/folders in your Drive are directly accessible. Existing files in the old Em Dash subfolder remain exactly where they are — they just appear as a regular folder in the tree.
