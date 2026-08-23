@@ -2117,43 +2117,23 @@ document.getElementById('import-file-input').addEventListener('change', async (e
   }
 });
 
-function exportCurrentFile() {
-  if (!editor.value && !driveFileName) { showToast('Nothing to export'); return; }
-  const blob = new Blob([editor.value], { type: 'text/markdown' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = driveFileName || currentTitle || 'untitled.md';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  showToast(`✓ Downloaded "${a.download}"`);
+function exportBasename() {
+  return (driveFileName || currentTitle || 'untitled').replace(/\.(md|markdown|txt)$/i, '');
 }
 
-document.getElementById('hdr-export-btn').addEventListener('click', () => {
-  document.getElementById('hdr-more-menu').classList.remove('open');
-  exportCurrentFile();
-});
-document.getElementById('hdr-export-pdf-btn').addEventListener('click', () => {
-  document.getElementById('hdr-more-menu').classList.remove('open');
-  exportAsPdf();
-});
+function triggerDownload(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast(`✓ Downloaded "${filename}"`);
+}
 
-// ── PDF export ────────────────────────────────────────────────────────────────
-function exportAsPdf() {
-  const content = previewInner.innerHTML;
-  if (!content.trim()) { showToast('Nothing to export'); return; }
-
-  const title = driveFileName
-    ? driveFileName.replace(/\.(md|markdown|txt)$/i, '')
-    : (currentTitle || 'document');
-
-  const printWin = window.open('', '_blank', 'width=900,height=700');
-  if (!printWin) { showToast('Pop-up blocked — allow pop-ups and try again'); return; }
-
-  printWin.document.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>${title.replace(/</g, '&lt;')}</title>
+function buildExportHtml() {
+  const title = exportBasename().replace(/</g, '&lt;');
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>${title}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.9.0/styles/github.min.css">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -2162,30 +2142,117 @@ h1,h2,h3,h4,h5,h6{line-height:1.25;margin:1.4em 0 .45em;font-weight:600}
 h1{font-size:22pt;border-bottom:2px solid #e0e0e0;padding-bottom:.3em;margin-top:.5em}
 h2{font-size:16pt;border-bottom:1px solid #e0e0e0;padding-bottom:.2em}
 h3{font-size:13pt}h4{font-size:11.5pt}h5,h6{font-size:11pt}
-p{margin:0 0 .75em}
-a{color:#0969da}
+p{margin:0 0 .75em}a{color:#0969da}
 code{font-family:'SF Mono','Fira Code',Menlo,Consolas,monospace;font-size:9.5pt;background:#f6f8fa;padding:2px 6px;border-radius:4px;border:1px solid #e0e0e0}
 pre{background:#f6f8fa;border:1px solid #e0e0e0;border-radius:6px;padding:14px 16px;overflow:visible;white-space:pre-wrap;word-break:break-all;margin:.75em 0}
 pre code{background:none;padding:0;font-size:9pt;border:none;border-radius:0}
 blockquote{border-left:4px solid #d0d7de;margin:.75em 0;padding:.1em 1em;color:#57606a}
 table{border-collapse:collapse;width:100%;margin:.75em 0}
 th,td{border:1px solid #d0d7de;padding:6px 14px;text-align:left}
-th{background:#f6f8fa;font-weight:600}
-tr:nth-child(even) td{background:#fafafa}
-img{max-width:100%;height:auto}
-hr{border:none;border-top:2px solid #e0e0e0;margin:1.5em 0}
-ul,ol{padding-left:1.8em;margin:0 0 .75em}
-li{margin:.2em 0}
-@media print{
-  body{padding:0}
-  pre{white-space:pre-wrap;page-break-inside:avoid}
-  h1,h2,h3{page-break-after:avoid}
-  table,figure{page-break-inside:avoid}
+th{background:#f6f8fa;font-weight:600}tr:nth-child(even) td{background:#fafafa}
+img{max-width:100%;height:auto}hr{border:none;border-top:2px solid #e0e0e0;margin:1.5em 0}
+ul,ol{padding-left:1.8em;margin:0 0 .75em}li{margin:.2em 0}
+</style></head>
+<body>${previewInner.innerHTML}</body></html>`;
 }
-</style>
-</head>
-<body>${content}</body>
-</html>`);
+
+function htmlToRtf(html) {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = DOMPurify.sanitize(html);
+  function esc(t) {
+    return t.replace(/\\/g, '\\\\').replace(/\{/g, '\\{').replace(/\}/g, '\\}')
+            .replace(/[^\x00-\x7F]/g, c => `\\u${c.charCodeAt(0)}?`);
+  }
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) return esc(node.textContent);
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    const tag = node.tagName.toLowerCase();
+    const inner = () => Array.from(node.childNodes).map(walk).join('');
+    switch (tag) {
+      case 'h1': return `\\pard\\sb480\\sa120\\b\\fs48 ${inner()}\\b0\\par\n`;
+      case 'h2': return `\\pard\\sb360\\sa100\\b\\fs40 ${inner()}\\b0\\par\n`;
+      case 'h3': return `\\pard\\sb240\\sa80\\b\\fs32 ${inner()}\\b0\\par\n`;
+      case 'h4': return `\\pard\\sb200\\sa60\\b\\fs28 ${inner()}\\b0\\par\n`;
+      case 'h5': case 'h6': return `\\pard\\sb160\\sa40\\b\\fs24 ${inner()}\\b0\\par\n`;
+      case 'p': return `\\pard\\sb0\\sa200 ${inner()}\\par\n`;
+      case 'br': return '\\line\n';
+      case 'strong': case 'b': return `{\\b ${inner()}}`;
+      case 'em': case 'i': return `{\\i ${inner()}}`;
+      case 'u': return `{\\ul ${inner()}}`;
+      case 's': case 'del': return `{\\strike ${inner()}}`;
+      case 'code': {
+        const inPre = node.parentElement && node.parentElement.tagName.toLowerCase() === 'pre';
+        return inPre ? inner() : `{\\f1\\fs20 ${inner()}}`;
+      }
+      case 'pre': return `\\pard\\sb100\\sa100\\li360\\f1\\fs20 ${inner()}\\f0\\fs24\\par\n`;
+      case 'blockquote': return `\\pard\\sb100\\sa100\\li720\\ri720\\cf2\\i ${inner()}\\i0\\cf1\\par\n`;
+      case 'ul': {
+        return Array.from(node.children).filter(c => c.tagName.toLowerCase() === 'li')
+          .map(li => `\\pard\\fi-360\\li720\\sb0\\sa80 \\bullet\\tab ${walk(li)}\\par\n`).join('');
+      }
+      case 'ol': {
+        let n = 0;
+        return Array.from(node.children).filter(c => c.tagName.toLowerCase() === 'li')
+          .map(li => `\\pard\\fi-360\\li720\\sb0\\sa80 ${++n}.\\tab ${walk(li)}\\par\n`).join('');
+      }
+      case 'li': return inner();
+      case 'a':  return inner();
+      case 'hr': return `\\pard\\brdrb\\brdrs\\brdrw10\\brsp20 \\par\n`;
+      case 'table': return `\\pard\\sb100\\sa100 [Table — see HTML export for full table]\\par\n`;
+      case 'img': return '';
+      case 'thead': case 'tbody': case 'tr': case 'th': case 'td': return inner();
+      default: return inner();
+    }
+  }
+  const body = Array.from(wrap.childNodes).map(walk).join('');
+  return `{\\rtf1\\ansi\\deff0\\deflang1033\n` +
+    `{\\fonttbl{\\f0\\froman\\fcharset0 Times New Roman;}{\\f1\\fmodern\\fcharset0 Courier New;}}\n` +
+    `{\\colortbl;\\red0\\green0\\blue0;\\red0\\green102\\blue204;}\n` +
+    `\\widowctrl\\hyphauto\\margl1800\\margr1800\\margt1440\\margb1440\\f0\\fs24\\cf1\n` +
+    body + `}`;
+}
+
+function exportAsMd()   { if (!editor.value) { showToast('Nothing to export'); return; } triggerDownload(new Blob([editor.value], { type: 'text/markdown' }), exportBasename() + '.md'); }
+function exportAsTxt()  { if (!editor.value) { showToast('Nothing to export'); return; } triggerDownload(new Blob([editor.value], { type: 'text/plain'    }), exportBasename() + '.txt'); }
+function exportAsHtml() { if (!editor.value) { showToast('Nothing to export'); return; } triggerDownload(new Blob([buildExportHtml()], { type: 'text/html'  }), exportBasename() + '.html'); }
+function exportAsRtf()  { if (!editor.value) { showToast('Nothing to export'); return; } triggerDownload(new Blob([htmlToRtf(previewInner.innerHTML)], { type: 'application/rtf' }), exportBasename() + '.rtf'); }
+
+async function exportAsDocx() {
+  if (!editor.value) { showToast('Nothing to export'); return; }
+  if (!window.htmlDocx) {
+    showToast('Loading DOCX converter…');
+    try {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js';
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    } catch (_) { showToast('Could not load DOCX converter'); return; }
+  }
+  triggerDownload(window.htmlDocx.asBlob(buildExportHtml()), exportBasename() + '.docx');
+}
+
+[['hdr-export-md-btn',   exportAsMd],
+ ['hdr-export-txt-btn',  exportAsTxt],
+ ['hdr-export-html-btn', exportAsHtml],
+ ['hdr-export-pdf-btn',  exportAsPdf],
+ ['hdr-export-docx-btn', exportAsDocx],
+ ['hdr-export-rtf-btn',  exportAsRtf],
+].forEach(([id, fn]) => {
+  document.getElementById(id).addEventListener('click', () => {
+    document.getElementById('hdr-more-menu').classList.remove('open');
+    fn();
+  });
+});
+
+// ── PDF export ────────────────────────────────────────────────────────────────
+function exportAsPdf() {
+  if (!previewInner.innerHTML.trim()) { showToast('Nothing to export'); return; }
+  const printWin = window.open('', '_blank', 'width=900,height=700');
+  if (!printWin) { showToast('Pop-up blocked — allow pop-ups and try again'); return; }
+  const html = buildExportHtml().replace('</style>', '@media print{body{padding:0}pre{white-space:pre-wrap;page-break-inside:avoid}h1,h2,h3{page-break-after:avoid}table,figure{page-break-inside:avoid}}</style>');
+  printWin.document.write(html);
   printWin.document.close();
   printWin.focus();
   setTimeout(() => { printWin.print(); printWin.close(); }, 400);

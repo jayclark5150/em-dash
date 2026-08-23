@@ -232,6 +232,10 @@ body {
 .hdr-dd-sep        { height: 1px; background: #3a3a3a; margin: 3px 6px; }
 .hdr-dd-danger     { color: #e06c75; }
 .hdr-dd-danger:hover { background: rgba(224,108,117,.15) !important; color: #e06c75; }
+.hdr-dd-label      { font-size: 10px; font-weight: 600; color: #666; padding: 6px 10px 3px; letter-spacing: .05em; text-transform: uppercase; }
+.hdr-export-grid   { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 2px 4px 4px; }
+.hdr-export-fmt    { justify-content: center; padding: 5px 4px; font-size: 11px; font-weight: 600; letter-spacing: .03em; border-radius: 4px; }
+body.theme-light .hdr-dd-label { color: #8c959f; }
 
 /* ── Format bar ── */
 #format-bar {
