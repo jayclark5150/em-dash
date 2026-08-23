@@ -73,6 +73,11 @@ Remember to add your Vercel deployment URL to the API key's HTTP referrer restri
 
 ## Changelog
 
+### v3.8.0
+
+- **Resizable sidebar** — drag the handle at the right edge of the file tree to set the sidebar width anywhere from 150 px to 500 px. The chosen width persists through sidebar open/close toggles.
+- **Folder state preserved on refresh** — previously, any action that triggered a tree refresh (save, move, rename, delete, new file) would collapse all expanded folders back to their closed state. Expanded folders now stay open and repopulate their contents automatically after every refresh.
+
 ### v3.7.0
 
 - **Tags column in database view** — Tags is now a permanent system column (between Title and auto-detected frontmatter columns). Click any cell to edit tags as a comma-separated list; they persist as a YAML array in each file's frontmatter. Empty cells show an "Add tags…" placeholder. Sortable by tag content.

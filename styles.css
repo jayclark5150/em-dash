@@ -368,7 +368,6 @@ body.theme-light .hdr-dd-label { color: #8c959f; }
   width: 0;
   overflow: hidden;
   background: var(--bg2);
-  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -692,6 +691,26 @@ body.theme-light .hdr-dd-label { color: #8c959f; }
 }
 #divider:hover, #divider.dragging { background: var(--accent); }
 
+#sidebar-divider {
+  width: 16px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+}
+#sidebar-divider::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 7px;
+  width: 2px;
+  background: var(--border);
+  transition: background 0.15s;
+}
+#sidebar-divider:hover::after,
+#sidebar-divider.dragging::after { background: var(--accent); }
+#file-sidebar:not(.open) + #sidebar-divider { display: none; }
+
 #line-numbers {
   width: 44px;
   padding: 20px 6px 20px 0;
@@ -944,7 +963,8 @@ body.focus-mode #focus-overlay { display: block; }
 body.focus-mode #header-bar  { display: none; }
 body.focus-mode #format-bar  { display: none; }
 body.focus-mode #statusbar   { display: none; }
-body.focus-mode #divider     { display: none; }
+body.focus-mode #divider          { display: none; }
+body.focus-mode #sidebar-divider  { display: none; }
 body.focus-mode #preview-wrapper  { display: none; }
 body.focus-mode #find-replace-bar { display: none; }
 body.focus-mode #editor-pane { display: none; }
@@ -1089,6 +1109,7 @@ body.theme-light #find-replace-bar button { background: #eaeef2; border-color: #
 
   /* Divider: no drag-resize on touch */
   #divider { display: none !important; }
+  #sidebar-divider { display: none !important; }
 
   /* Editor / preview: full width each when shown */
   #editor-pane, #preview-wrapper { min-width: 0; }

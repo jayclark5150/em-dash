@@ -1405,6 +1405,38 @@ window.addEventListener('beforeunload', (e) => {
   });
 })();
 
+// ── Resizable sidebar divider ─────────────────────────────────────────────────
+(function () {
+  const sidebarDivider = document.getElementById('sidebar-divider');
+  const sidebar        = document.getElementById('file-sidebar');
+  let dragging = false, startX = 0, startW = 0;
+
+  sidebarDivider.addEventListener('mousedown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    startW = sidebar.getBoundingClientRect().width;
+    sidebarDivider.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    sidebar.style.transition = 'none';
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const newW = Math.min(500, Math.max(150, startW + (e.clientX - startX)));
+    document.documentElement.style.setProperty('--sb-w', newW + 'px');
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    sidebarDivider.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    sidebar.style.transition = '';
+  });
+})();
+
 // ── Service worker ────────────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(console.error);
@@ -1678,6 +1710,12 @@ async function renderFolderContents(folderId, containerEl, depth) {
   if (countEl) {
     const n = entry.folders.length + entry.files.length;
     countEl.textContent = n ? n : '';
+  }
+  for (const f of entry.folders) {
+    if (expandedFolders.has(f.id)) {
+      const childrenEl = childrenElMap[f.id];
+      if (childrenEl) await renderFolderContents(f.id, childrenEl, depth + 1);
+    }
   }
 }
 
