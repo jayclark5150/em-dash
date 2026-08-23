@@ -515,7 +515,7 @@ async function onDriveConnected() {
   try {
     await ensureRootFolder();
     selectedFolderId = driveRootFolderId;
-    document.getElementById('sidebar-folder-name').textContent = DRIVE_ROOT_FOLDER_NAME;
+    document.getElementById('sidebar-folder-name').textContent = 'My Drive';
     await renderTree();
   } catch (e) {
     showToast('Could not set up the "' + DRIVE_ROOT_FOLDER_NAME + '" folder: ' + gErr(e), 5000);
@@ -555,7 +555,7 @@ document.getElementById('hdr-drive-signout').addEventListener('click', () => {
   driveFileInfo.textContent = '';
   updateDriveLink(null);
   renderRecents();
-  document.getElementById('sidebar-folder-name').textContent = DRIVE_ROOT_FOLDER_NAME;
+  document.getElementById('sidebar-folder-name').textContent = 'My Drive';
   fileTreeEl.innerHTML = '<div class="sidebar-empty">Connect Google Drive to see your files.</div>';
   showToast('Signed out of Google Drive');
 });
@@ -1649,18 +1649,18 @@ async function renderTree() {
   childrenElMap    = {};
   nodeDepthMap     = {};
   folderCountElMap = {};
-  if (!driveConnected || !driveRootFolderId) {
+  if (!driveConnected) {
     fileTreeEl.innerHTML = '<div class="sidebar-empty">Connect Google Drive to see your files.</div>';
     return;
   }
   const rootContainer = document.createElement('div');
   rootContainer.className = 'tree-root';
-  childrenElMap[driveRootFolderId] = rootContainer;
-  nodeDepthMap[driveRootFolderId]  = -1;
+  childrenElMap['root'] = rootContainer;
+  nodeDepthMap['root']  = -1;
   fileTreeEl.appendChild(rootContainer);
-  await renderFolderContents(driveRootFolderId, rootContainer, 0);
+  await renderFolderContents('root', rootContainer, 0);
   if (!rootContainer.children.length) {
-    fileTreeEl.innerHTML = '<div class="sidebar-empty">No files yet.<br>Use the + buttons above, or Import, to add one.</div>';
+    fileTreeEl.innerHTML = '<div class="sidebar-empty">No files in My Drive.</div>';
   }
   highlightOpenFileInTree();
 }
@@ -1928,7 +1928,7 @@ async function renameDriveItem(node, newName, isFolder) {
   try {
     await gapi.client.drive.files.update({ fileId: node.id, resource: { name: newName } });
     if (!isFolder && driveFileId === node.id) { driveFileName = newName; currentTitle = newName; setTitle(newName); }
-    if (isFolder && node.id === driveRootFolderId) document.getElementById('sidebar-folder-name').textContent = newName;
+    // sidebar header always shows "My Drive" now — no update needed on rename
     const parentId = (node.parents && node.parents[0]) || driveRootFolderId;
     delete treeCache[parentId];
     showToast('✓ Renamed');
