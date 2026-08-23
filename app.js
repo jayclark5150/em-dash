@@ -11,19 +11,13 @@
 const APP_CONFIG       = window.APP_CONFIG || {};
 const GOOGLE_CLIENT_ID = APP_CONFIG.GOOGLE_CLIENT_ID || '';
 const GOOGLE_API_KEY   = APP_CONFIG.GOOGLE_API_KEY   || '';
-// Full Drive scope: at real-world scale (users with hundreds of pre-existing
-// files in their "Em Dash" folder), the narrow drive.file scope requires
-// individually granting access to every file via the Picker, which does not
-// scale. drive.file access is per-item and does not cascade from a selected
-// folder to its existing children — see git history for the abandoned
-// per-file-Picker-grant approach. The app still only reads/writes within the
-// "Em Dash" folder subtree by its own logic, even though this scope grants
-// broader technical access to the account's Drive.
+// Full Drive scope: the narrow drive.file scope requires individually granting
+// access to every file via the Picker, which does not scale. drive.file access
+// is per-item and does not cascade from a selected folder to its existing
+// children — see git history for the abandoned per-file-Picker-grant approach.
 const SCOPES            = 'https://www.googleapis.com/auth/drive';
 const DISCOVERY_DOC    = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-const DRIVE_ROOT_FOLDER_NAME = APP_CONFIG.DRIVE_ROOT_FOLDER_NAME || 'Em Dash';
 const FOLDER_MIME       = 'application/vnd.google-apps.folder';
-const ROOT_FOLDER_ID_KEY = 'emdash-root-folder-id';
 const RECENTS_KEY        = 'emdash-recents';
 const RECENTS_MAX        = 8;
 const DRIVE_AUTH_KEY     = 'emdash-drive-connected';
@@ -72,7 +66,7 @@ let currentTitle       = 'New Document';
 let isDirty            = false;
 let autoSaveTimer      = null;
 let tokenClient        = null;
-let driveRootFolderId  = null; // id of the "Em Dash" root folder in the user's Drive
+let driveRootFolderId  = null; // 'root' when connected, null when signed out
 
 // ── Sidebar tree state ───────────────────────────────────────────────────────
 let treeCache        = {};            // folderId -> { folders: [...], files: [...] }
@@ -477,34 +471,12 @@ function ensureTokenClient() {
   return tokenClient;
 }
 
-async function ensureRootFolder() {
-  let stored = null;
-  try { stored = localStorage.getItem(ROOT_FOLDER_ID_KEY); } catch (_) {}
-  if (stored) {
-    try {
-      const res = await gapi.client.drive.files.get({ fileId: stored, fields: 'id,name,trashed' });
-      if (res.result && !res.result.trashed) { driveRootFolderId = stored; return stored; }
-    } catch (_) { /* stored id is stale — fall through and re-resolve */ }
-  }
-  const safeName = DRIVE_ROOT_FOLDER_NAME.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const q = `name='${safeName}' and mimeType='${FOLDER_MIME}' and trashed=false`;
-  const res = await gapi.client.drive.files.list({ q, fields: 'files(id,name)', pageSize: 1 });
-  let folder = (res.result.files || [])[0];
-  if (!folder) {
-    const createRes = await gapi.client.drive.files.create({
-      resource: { name: DRIVE_ROOT_FOLDER_NAME, mimeType: FOLDER_MIME },
-      fields: 'id,name'
-    });
-    folder = createRes.result;
-  }
-  driveRootFolderId = folder.id;
-  try { localStorage.setItem(ROOT_FOLDER_ID_KEY, driveRootFolderId); } catch (_) {}
-  return driveRootFolderId;
-}
-
 async function onDriveConnected() {
   driveConnected = true;
   try { localStorage.setItem(DRIVE_AUTH_KEY, '1'); } catch (_) {}
+  // Clear any stale Em Dash subfolder ID from older versions
+  try { localStorage.removeItem('emdash-root-folder-id'); } catch (_) {}
+  driveRootFolderId = 'root';
   setDriveStatus('connected', 'Drive connected');
   // Header dropdown: hide "Connect", reveal "Sign out" + "Sync"
   document.getElementById('hdr-drive-connect').style.display  = 'none';
@@ -512,14 +484,9 @@ async function onDriveConnected() {
   if (!driveFileId) driveFileInfo.textContent = '☁ Drive (new)';
   renderRecents();
   showToast('✓ Connected to Google Drive');
-  try {
-    await ensureRootFolder();
-    selectedFolderId = driveRootFolderId;
-    document.getElementById('sidebar-folder-name').textContent = 'My Drive';
-    await renderTree();
-  } catch (e) {
-    showToast('Could not set up the "' + DRIVE_ROOT_FOLDER_NAME + '" folder: ' + gErr(e), 5000);
-  }
+  selectedFolderId = driveRootFolderId;
+  document.getElementById('sidebar-folder-name').textContent = 'My Drive';
+  await renderTree();
 }
 
 document.getElementById('hdr-drive-connect').addEventListener('click', () => {
@@ -1612,7 +1579,7 @@ document.addEventListener('keydown', (e) => {
 })();
 
 // ── Sidebar: Google Drive folder/file tree ────────────────────────────────────
-// The sidebar shows only the subtree rooted at the "Em Dash" Drive folder
+// The sidebar shows the user's Drive tree starting from 'root'
 // (see ensureRootFolder()). Folders are fetched lazily as they're expanded and
 // cached in treeCache; drag-and-drop reparents items via files.update with
 // addParents/removeParents.

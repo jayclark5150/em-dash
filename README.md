@@ -8,8 +8,8 @@ The closest thing to what Em Dash could become is a private Notion that lives en
 
 ## Features
 
-- **Google Drive as the only backend** — Em Dash creates (or reuses) a folder named **"Em Dash"** at the root of your Drive and keeps all of its documents inside that folder's subtree in its own UI. It doesn't touch anything outside that folder.
-- **Sees everything in the folder, including files added outside the app** — files you drop into "Em Dash" from Drive's own UI (rather than creating them through Em Dash) show up in the sidebar too, no extra step required.
+- **Google Drive as the only backend** — Em Dash uses your Drive root directly, showing everything in My Drive through its own folder tree. No separate app folder — it's just your Drive.
+- **Sees everything, including files added outside the app** — files you drop into any folder from Drive's own UI show up in the sidebar too, no extra step required.
 - **Persistent sidebar with a real folder tree** — expand/collapse nested folders, click a file to open it. The tree is backed by actual Drive folders via the Drive API v3 (not a flat file list), and paginates through the full folder contents rather than stopping at the first page.
 - **Drag-and-drop organization** — drag a file or folder onto another folder to move/re-nest it (`files.update` with `addParents`/`removeParents`).
 - **Inline create, rename, delete** — "+" buttons in the sidebar header create a new file or folder inline, without a modal; double-click a name (or use the small pencil icon) to rename in place; the trash icon deletes with a confirmation.
@@ -43,7 +43,7 @@ Because storage is Google Drive only, Em Dash needs a working Google OAuth clien
 2. Create (or select) a project, then enable the **Google Drive API** (APIs & Services → Library).
 3. Create an **OAuth 2.0 Client ID** (Application type: *Web application*). Add the origin(s) you'll serve the app from (e.g. `http://localhost:8000`, your production URL) under **Authorized JavaScript origins**.
 4. Create an **API key** (APIs & Services → Credentials → Create Credentials → API key). Restrict it: **HTTP referrers** limited to your domain(s), and **API restrictions** limited to the Google Drive API.
-5. Note the OAuth scope the app requests: `https://www.googleapis.com/auth/drive`. This is full read/write access to the account's Drive — Em Dash's own UI only ever reads or writes within the "Em Dash" folder subtree, but the token itself is not restricted to that folder. This was chosen deliberately over the narrower `drive.file` scope: `drive.file` only grants access to files an app creates or that a user individually selects via Google's file picker, which does not scale to an existing folder with dozens or hundreds of files already in it (each one would need to be selected one at a time). If you're publishing the OAuth consent screen beyond "Testing" status for broader use, Google requires a verification review for this scope — see [Drive API scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth) for the tradeoffs of narrower alternatives.
+5. Note the OAuth scope the app requests: `https://www.googleapis.com/auth/drive`. This is full read/write access to the account's Drive. This was chosen deliberately over the narrower `drive.file` scope: `drive.file` only grants access to files an app creates or that a user individually selects via Google's file picker, which does not scale to a Drive with dozens or hundreds of existing files (each one would need to be selected one at a time). If you're publishing the OAuth consent screen beyond "Testing" status for broader use, Google requires a verification review for this scope — see [Drive API scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth) for the tradeoffs of narrower alternatives.
 6. **If you're upgrading from an older version of Em Dash** that used the `drive.file` scope, existing users need to reconnect (Sign out of Drive, then Connect Google Drive again) so the browser re-prompts for the new, broader permission — a previously-issued token won't automatically pick up the wider scope.
 
 ### 2. Configure the app
@@ -57,9 +57,8 @@ Edit `config.js` and fill in:
 
 - `GOOGLE_CLIENT_ID` — the OAuth Client ID from step 1.
 - `GOOGLE_API_KEY` — the API key from step 1.
-- `DRIVE_ROOT_FOLDER_NAME` (optional) — the Drive folder Em Dash uses as its root. Defaults to `"Em Dash"`.
 
-Open the local URL in Chrome or Edge, click **Connect Google Drive** from the "…" menu, and grant access. Em Dash will create the root folder on first connect if it doesn't already exist.
+Open the local URL in Chrome or Edge, click **Connect Google Drive** from the "…" menu, and grant access.
 
 `config.js` is **gitignored** and never committed. Because the app is fully client-side, any API key it uses is visible in the browser — that's why it's restricted by HTTP referrer and scoped to the Drive API only in step 1.
 
@@ -70,12 +69,16 @@ The repo is configured for **Vercel**. `vercel.json` sets `build-config.js` as t
 To deploy your own copy:
 
 1. Import the repo into [Vercel](https://vercel.com).
-2. Add `GOOGLE_CLIENT_ID` and `GOOGLE_API_KEY` under Project Settings → Environment Variables.
+2. Add `GOOGLE_CLIENT_ID` and `GOOGLE_API_KEY` under Project Settings → Environment Variables (no `DRIVE_ROOT_FOLDER_NAME` needed).
 3. Push to `main` — Vercel builds and deploys automatically.
 
 Remember to add your Vercel deployment URL to the API key's HTTP referrer restrictions and to your OAuth client's authorized JavaScript origins in the Google Cloud Console.
 
 ## Changelog
+
+### v3.9.0
+
+- **My Drive root** — Em Dash now shows your full Drive tree starting at My Drive root instead of keeping files inside a dedicated "Em Dash" subfolder. The sidebar header reads "My Drive" and all files/folders in your Drive are directly accessible. Existing files in the old Em Dash subfolder remain exactly where they are — they just appear as a regular folder in the tree.
 
 ### v3.8.0
 

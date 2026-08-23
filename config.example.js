@@ -47,11 +47,6 @@ window.APP_CONFIG = {
   // - API: Google Drive API only
   GOOGLE_API_KEY: 'PLACEHOLDER_API_KEY',
 
-  // Name of the folder Em Dash creates (or reuses) at the root of the user's
-  // Google Drive to hold all of its documents. The sidebar only ever shows
-  // this folder's subtree — never the rest of the user's Drive. Change this
-  // if you want a differently-named root folder for your deployment.
-  DRIVE_ROOT_FOLDER_NAME: 'Em Dash',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
