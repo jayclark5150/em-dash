@@ -692,23 +692,13 @@ body.theme-light .hdr-dd-label { color: #8c959f; }
 #divider:hover, #divider.dragging { background: var(--accent); }
 
 #sidebar-divider {
-  width: 16px;
+  width: 5px;
   cursor: col-resize;
-  flex-shrink: 0;
-  position: relative;
-}
-#sidebar-divider::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 7px;
-  width: 2px;
   background: var(--border);
+  flex-shrink: 0;
   transition: background 0.15s;
 }
-#sidebar-divider:hover::after,
-#sidebar-divider.dragging::after { background: var(--accent); }
+#sidebar-divider:hover, #sidebar-divider.dragging { background: var(--accent); }
 #file-sidebar:not(.open) + #sidebar-divider { display: none; }
 
 #line-numbers {
