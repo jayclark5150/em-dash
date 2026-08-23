@@ -2,6 +2,10 @@
 
 A markdown editor that lives entirely in your browser and stores every document in **Google Drive** — no other storage backend, no server, no database. Em Dash gives you a persistent folder tree in the sidebar, drag-and-drop organization, live preview, and a distraction-free focus mode, all as an installable offline-capable PWA.
 
+Google Workspace integrations push it further toward a personal knowledge management tool (like Notion or Obsidian, but Google-native) — Tasks keeps your to-dos, Calendar keeps your schedule, and Em Dash is where you actually write about all of it, with everything staying in your own Drive.
+
+The closest thing to what Em Dash could become is a private Notion that lives entirely in your Google account — which is actually a pretty compelling niche Google has never filled themselves.
+
 ## Features
 
 - **Google Drive as the only backend** — Em Dash creates (or reuses) a folder named **"Em Dash"** at the root of your Drive and keeps all of its documents inside that folder's subtree in its own UI. It doesn't touch anything outside that folder.

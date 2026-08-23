@@ -647,7 +647,7 @@ async function openDatabaseView(folderId, folderName) {
 
   try {
     const entry = await fetchFolderChildren(folderId);
-    const files  = entry.files.filter(isMarkdownLikeFile);
+    const files  = entry.files.filter(f => canOpenAsText(f.mimeType));
     if (!files.length) {
       dbRows = []; dbCols = [];
       dbRowCache[folderId] = { rows: dbRows, cols: dbCols };
