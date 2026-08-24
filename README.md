@@ -23,7 +23,8 @@ The closest thing to what Em Dash could become is a private Notion that lives en
 - **Sidebar sort order** — a toggle button in the sidebar header switches between Z→A and A→Z name order (Z→A by default, so ISO-date filenames show newest first). The sidebar also shows a count badge on each folder once expanded.
 - **Recently opened files** — a collapsible "Recent" section at the top of the sidebar lists the last 8 files you opened, persisted across sessions. Click the header to collapse or expand it.
 - **Open in Drive** — a small ↗ icon in the status bar links directly to the current file in drive.google.com.
-- **Database view** — hover any subfolder and click the table icon to open it as a spreadsheet. Each `.md` file becomes a row; YAML frontmatter keys become columns (auto-detected). Text cells are editable inline, booleans render as checkboxes, arrays render as tags. Tags is always a system column — click any tags cell to type comma-separated values. Modified date and file size are always shown. Click a title to open the file; click any column header to sort. Use "+ Add property" to define new frontmatter columns without leaving the table.
+- **Database view** — hover any folder and click the table icon to open it as a spreadsheet. Each `.md` file becomes a row; YAML frontmatter keys become columns (auto-detected). Text cells are editable inline, booleans render as checkboxes, arrays render as tags. Tags is always a system column — click any tags cell to type comma-separated values. Modified date and file size are always shown. Click a title to open the file; click any column header to sort. Use "+ Add property" to define new frontmatter columns without leaving the table.
+- **Board view** — hover any folder and click the columns icon to open it as a Kanban board. Each subfolder becomes a column; each file becomes a draggable card. Drag cards between columns to move files in Drive. Click a card to open it in the editor. "+ Add task" creates a new `.md` file in that column's folder.
 - **Sidebar toggle** — Cmd+\ (or the panel button at the top-left of the header) collapses/expands the file sidebar for a full-width editing view.
 - **Duplicate file** — hover any file in the sidebar to reveal a copy icon that creates "Copy of …" in the same folder.
 - **Export as PDF** — "Export as PDF" in the `…` menu renders the current document to a print-ready popup and opens the browser's print dialog. Choose "Save as PDF" to download.
@@ -64,7 +65,7 @@ Open the local URL in Chrome or Edge, click **Connect Google Drive** from the "�
 
 ## Deployment
 
-The repo is configured for **Vercel**. `vercel.json` sets `build-config.js` as the build command, which reads `GOOGLE_CLIENT_ID`, `GOOGLE_API_KEY`, and optionally `DRIVE_ROOT_FOLDER_NAME` from Vercel's Environment Variables and writes them into `config.js` at deploy time. `config.js` is gitignored, so credentials never touch the repo.
+The repo is configured for **Vercel**. `vercel.json` sets `build-config.js` as the build command, which reads `GOOGLE_CLIENT_ID` and `GOOGLE_API_KEY` from Vercel's Environment Variables and writes them into `config.js` at deploy time. `config.js` is gitignored, so credentials never touch the repo.
 
 To deploy your own copy:
 
