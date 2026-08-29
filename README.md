@@ -19,7 +19,7 @@ The closest thing to what Em Dash could become is a private Notion that lives en
 - **Find & replace** — with match navigation and replace-all.
 - **Auto-save** — saves two seconds after you stop typing, straight to the open Drive file.
 - **Offline** — installable as a PWA; the app shell works without a connection (Drive sync obviously needs one).
-- **Three themes** — Lokai (dark editor, light preview), Dark, and Light. Persisted across sessions.
+- **Three themes** — Lokai (warm parchment palette), Dark (warm-dark), and Light (clean white). Persisted across sessions.
 - **Sidebar sort order** — a toggle button in the sidebar header switches between Z→A and A→Z name order (Z→A by default, so ISO-date filenames show newest first). The sidebar also shows a count badge on each folder once expanded.
 - **Recently opened files** — a collapsible "Recent" section at the top of the sidebar lists the last 8 files you opened, persisted across sessions. Click the header to collapse or expand it.
 - **Open in Drive** — a small ↗ icon in the status bar links directly to the current file in drive.google.com.
@@ -76,6 +76,12 @@ To deploy your own copy:
 Remember to add your Vercel deployment URL to the API key's HTTP referrer restrictions and to your OAuth client's authorized JavaScript origins in the Google Cloud Console.
 
 ## Changelog
+
+### v3.11.0
+
+- **Warm Claude-style palette** — replaces the dark Lokai toolbar and GitHub-blue accents across all three themes. Lokai (default) now uses a warm parchment base (`#faf9f5` background, `#f0eee6`/`#e8e4d9` surfaces, `#e3ddd0` borders, terracotta `#d97757`/`#c15f3c` accents). Dark is retinted to a warm-dark palette (`#1a1714` base). Light is now a clean all-white palette (`#ffffff`). All hardcoded blue values (`#58a6ff`, `#0969da`, `rgba(88,166,255,*)`) replaced with terracotta equivalents.
+- **Larger font sizes** — editor and line numbers: 14 px → 16 px; file tree: 14 px → 14.5 px; modal, database table, and board-card text each increase by 1 px.
+- **PWA theme color** — `manifest.json` `theme_color`/`background_color` and the HTML `meta[name=theme-color]` updated to `#faf9f5`.
 
 ### v3.10.0
 
