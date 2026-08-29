@@ -1175,6 +1175,9 @@ body.theme-light #find-replace-bar input { background: #ffffff; border-color: #e
 body.theme-light #find-replace-bar button { background: #f2f2f2; border-color: #e5e5e5; color: #666666; }
 body.theme-light #preview-pane code { background: #f2f2f2; }
 body.theme-light #preview-pane pre  { background: #f9f9f9; }
+body.theme-light #focus-wysiwyg code { background: #f2f2f2; }
+body.theme-light #focus-wysiwyg pre  { background: #f9f9f9; }
+body.theme-light .hdr-dd-item svg { color: #aaaaaa; }
 
 /* ── iPad / tablet (portrait, Split View, Slide Over) ── */
 @media (max-width: 1024px) {
