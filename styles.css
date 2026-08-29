@@ -64,7 +64,7 @@ body.theme-light {
 
   --bg:       #ffffff;
   --bg2:      #ffffff;
-  --bg3:      #f2f2f2;
+  --bg3:      #efefef;
   --border:   #e5e5e5;
   --text:     #1a1a1a;
   --text2:    #666666;
@@ -1157,7 +1157,7 @@ body.theme-light .fmt-btn      { color: #666666; }
 body.theme-light .fmt-btn:hover { background: #f2f2f2; color: #1a1a1a; }
 body.theme-light .fmt-btn.active { background: rgba(217,119,87,.15); color: #d97757; }
 body.theme-light .fmt-sep      { background: #e5e5e5; }
-body.theme-light .fmt-view-group { background: #f2f2f2; }
+body.theme-light .fmt-view-group { background: #ebebeb; }
 body.theme-light .fmt-view-group .fmt-btn.active { background: #d97757; color: #fff; }
 body.theme-light .fmt-view-group .fmt-btn.active:hover { background: #c15f3c; }
 body.theme-light .fmt-dropdown { background: #ffffff; border-color: #e5e5e5; }
@@ -1169,6 +1169,8 @@ body.theme-light .tw-tip { background: #1a1a1a; color: #ffffff; border-color: #4
 body.theme-light #title-input { background: #ffffff; border-color: #d97757; color: #1a1a1a; }
 body.theme-light #tb-title { color: #666666; }
 body.theme-light #tb-title:hover { color: #1a1a1a; }
+body.theme-light #sidebar-divider { background: #ffffff; }
+body.theme-light #divider         { background: #e5e5e5; }
 body.theme-light #statusbar { background: #ffffff; border-top-color: #e5e5e5; color: #666666; }
 body.theme-light #find-replace-bar { background: #ffffff; border-bottom-color: #e5e5e5; }
 body.theme-light #find-replace-bar input { background: #ffffff; border-color: #e5e5e5; color: #1a1a1a; }
@@ -1178,6 +1180,9 @@ body.theme-light #preview-pane pre  { background: #f5f5f5; }
 body.theme-light #focus-wysiwyg code { background: #f2f2f2; }
 body.theme-light #focus-wysiwyg pre  { background: #f5f5f5; }
 body.theme-light .hdr-dd-item svg { color: #aaaaaa; }
+body.theme-light .modal-search { background: #ffffff; }
+body.theme-light .modal-input  { background: #ffffff; }
+body.theme-light .btn-secondary { background: #efefef; }
 
 /* ── iPad / tablet (portrait, Split View, Slide Over) ── */
 @media (max-width: 1024px) {
